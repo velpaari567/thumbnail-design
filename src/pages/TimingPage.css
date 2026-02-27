@@ -1,0 +1,116 @@
+.timing-page {
+    padding-top: var(--space-xl);
+    padding-bottom: 120px;
+}
+
+.timing-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-2xl);
+}
+
+.timing-header>div:nth-child(2) {
+    flex: 1;
+}
+
+.timing-title {
+    font-size: var(--font-3xl);
+    font-weight: 800;
+}
+
+.timing-subtitle {
+    color: var(--text-secondary);
+    margin-top: var(--space-xs);
+}
+
+.timing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-lg);
+    max-width: 800px;
+}
+
+.timing-card {
+    text-align: center;
+    padding: var(--space-2xl) var(--space-xl);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    border: 2px solid transparent;
+    position: relative;
+}
+
+.timing-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.timing-card.selected {
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-glow);
+    background: rgba(124, 58, 237, 0.08);
+}
+
+.timing-check {
+    position: absolute;
+    top: var(--space-md);
+    right: var(--space-md);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.timing-icon {
+    font-size: 3rem;
+    margin-bottom: var(--space-lg);
+}
+
+.timing-label {
+    font-size: var(--font-xl);
+    font-weight: 700;
+    margin-bottom: var(--space-sm);
+}
+
+.timing-desc {
+    color: var(--text-secondary);
+    font-size: var(--font-sm);
+    margin-bottom: var(--space-lg);
+}
+
+.timing-free {
+    color: var(--success);
+    font-weight: 700;
+    font-size: var(--font-lg);
+}
+
+.timing-extra {
+    color: var(--warning);
+    font-weight: 700;
+    font-size: var(--font-lg);
+}
+
+.timing-tag {
+    margin-top: var(--space-md);
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    background: var(--success-bg);
+    color: var(--success);
+    font-size: var(--font-xs);
+    font-weight: 600;
+}
+
+@media (max-width: 700px) {
+    .timing-grid {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+    }
+
+    .timing-header {
+        flex-direction: column;
+    }
+}
