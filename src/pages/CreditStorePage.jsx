@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCreditPackages } from '../data/pricingData';
 import { addCredits, getUserCredits } from '../utils/credits';
+import { getOffers, categorizeOffers, getTimeRemaining, getStartsIn } from '../utils/offers';
 import { useAuth } from '../context/AuthContext';
 import './CreditStorePage.css';
 
@@ -10,6 +11,7 @@ const CreditStorePage = () => {
     const { user } = useAuth();
     const [packages, setPackages] = useState([]);
     const [credits, setCredits] = useState({ free: 0, pro: 0 });
+    const [offers, setOffers] = useState({ active: [], upcoming: [], expired: [] });
     const [purchasedId, setPurchasedId] = useState(null);
     const [showSuccess, setShowSuccess] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -17,12 +19,14 @@ const CreditStorePage = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [pkgs, creds] = await Promise.all([
+                const [pkgs, creds, allOffers] = await Promise.all([
                     getCreditPackages(),
-                    user ? getUserCredits(user.uid) : Promise.resolve({ free: 0, pro: 0 })
+                    user ? getUserCredits(user.uid) : Promise.resolve({ free: 0, pro: 0 }),
+                    getOffers()
                 ]);
                 setPackages(pkgs);
                 setCredits(creds);
+                setOffers(categorizeOffers(allOffers));
             } catch (error) {
                 console.error('Error loading credit store:', error);
             }
@@ -97,6 +101,51 @@ const CreditStorePage = () => {
                             <polyline points="22 4 12 14.01 9 11.01" />
                         </svg>
                         Credits added successfully!
+                    </div>
+                )}
+
+                {/* Offers Display */}
+                {(offers.active.length > 0 || offers.upcoming.length > 0) && (
+                    <div className="credits-offers-section animate-fade-in-up stagger-2">
+                        {offers.active.length > 0 && (
+                            <div className="credits-offers-group">
+                                <h3 className="credits-offers-title"><span className="live-dot"></span> LIVE OFFERS</h3>
+                                <div className="credits-offers-list">
+                                    {offers.active.map(offer => (
+                                        <div key={offer.id} className="credits-offer-banner glass-card active">
+                                            <div className="credits-offer-icon">{offer.emoji}</div>
+                                            <div className="credits-offer-content">
+                                                <h4>{offer.title}</h4>
+                                                <p>{offer.description}</p>
+                                                {offer.endDate && (
+                                                    <span className="credits-offer-timer">⏳ {getTimeRemaining(offer.endDate)}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {offers.upcoming.length > 0 && (
+                            <div className="credits-offers-group">
+                                <h3 className="credits-offers-title"><span className="upcoming-dot"></span> UPCOMING DEALS</h3>
+                                <div className="credits-offers-list">
+                                    {offers.upcoming.map(offer => (
+                                        <div key={offer.id} className="credits-offer-banner glass-card upcoming">
+                                            <div className="credits-offer-icon">{offer.emoji}</div>
+                                            <div className="credits-offer-content">
+                                                <h4>{offer.title}</h4>
+                                                <p>{offer.description}</p>
+                                                {offer.startDate && (
+                                                    <span className="credits-offer-timer">🗓️ {getStartsIn(offer.startDate)}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

@@ -838,11 +838,55 @@ const AdminPage = () => {
                             <div key={template.id} className="admin-template-card glass-card">
                                 <div className="admin-template-header">
                                     <div className="admin-template-icon" style={{ background: template.previewColor }}>
-                                        {template.icon}
+                                        <input
+                                            type="text"
+                                            value={template.icon}
+                                            onChange={(e) => updateTemplate(tIndex, 'icon', e.target.value)}
+                                            style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: 'white',
+                                                fontSize: '1.5rem',
+                                                width: '40px',
+                                                textAlign: 'center',
+                                                padding: 0
+                                            }}
+                                            title="Edit Emoji/Icon"
+                                        />
                                     </div>
-                                    <div>
-                                        <h3>{template.name}</h3>
-                                        <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-muted)' }}>{template.description}</p>
+                                    <div style={{ flex: 1 }}>
+                                        <input
+                                            type="text"
+                                            value={template.name}
+                                            onChange={(e) => updateTemplate(tIndex, 'name', e.target.value)}
+                                            style={{
+                                                background: 'transparent',
+                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                borderRadius: '4px',
+                                                color: 'white',
+                                                fontSize: '1.2rem',
+                                                fontWeight: 'bold',
+                                                width: '100%',
+                                                marginBottom: '4px',
+                                                padding: '4px 8px'
+                                            }}
+                                            title="Edit Template Name"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={template.description}
+                                            onChange={(e) => updateTemplate(tIndex, 'description', e.target.value)}
+                                            style={{
+                                                background: 'transparent',
+                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                borderRadius: '4px',
+                                                color: 'var(--text-muted)',
+                                                fontSize: 'var(--font-sm)',
+                                                width: '100%',
+                                                padding: '4px 8px'
+                                            }}
+                                            title="Edit Template Description"
+                                        />
                                     </div>
                                     <div className="admin-template-cost">
                                         <label>Regular Credits</label>
