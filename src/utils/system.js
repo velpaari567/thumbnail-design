@@ -5,7 +5,9 @@ const SYSTEM_DOC_ID = 'systemSettings';
 
 const defaultSettings = {
     disableFreeGeneration: false,
-    disableAllGeneration: false
+    disableAllGeneration: false,
+    enableMonthlyFreeCredits: true,
+    monthlyFreeCreditsAmount: 10
 };
 
 // Get settings once

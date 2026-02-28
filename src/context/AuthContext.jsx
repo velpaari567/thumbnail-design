@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../firebase';
+import { getSystemSettings } from '../utils/system';
 
 const ADMIN_EMAIL = 'tempomailis001@gmail.com';
 
@@ -29,24 +30,45 @@ export const AuthProvider = ({ children }) => {
                 const userRef = doc(db, 'users', firebaseUser.uid);
                 const userSnap = await getDoc(userRef);
 
+                // Handle Monthly Free Credits
+                const systemSettings = await getSystemSettings();
+                const now = new Date();
+                const currentMonth = `${now.getFullYear()}-${now.getMonth() + 1}`; // e.g. "2024-3"
+
                 if (!userSnap.exists()) {
-                    // New user — create with default credits
+                    // New user — create with default or requested credits
+                    const initialFreeCredits = systemSettings.enableMonthlyFreeCredits ? systemSettings.monthlyFreeCreditsAmount : 0;
+
                     await setDoc(userRef, {
                         email: firebaseUser.email,
                         displayName: firebaseUser.displayName,
                         photoURL: firebaseUser.photoURL,
-                        credits: { free: 10, pro: 0 },
+                        credits: { free: initialFreeCredits, pro: 0 },
+                        lastFreeCreditMonth: currentMonth,
                         isAdmin: firebaseUser.email === ADMIN_EMAIL,
                         createdAt: serverTimestamp(),
                         lastLoginAt: serverTimestamp(),
                     });
                 } else {
-                    // Existing user — update last login
-                    await setDoc(userRef, {
+                    // Existing user
+                    const userData = userSnap.data();
+                    const updates = {
                         displayName: firebaseUser.displayName,
                         photoURL: firebaseUser.photoURL,
                         lastLoginAt: serverTimestamp(),
-                    }, { merge: true });
+                    };
+
+                    // Check if we need to refill free credits
+                    if (
+                        systemSettings.enableMonthlyFreeCredits &&
+                        userData.lastFreeCreditMonth !== currentMonth
+                    ) {
+                        const currentPro = userData.credits?.pro || 0;
+                        updates.credits = { free: systemSettings.monthlyFreeCreditsAmount, pro: currentPro };
+                        updates.lastFreeCreditMonth = currentMonth;
+                    }
+
+                    await updateDoc(userRef, updates);
                 }
             } else {
                 setUser(null);

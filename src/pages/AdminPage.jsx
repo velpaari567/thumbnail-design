@@ -19,7 +19,12 @@ const AdminPage = () => {
     const [templates, setTemplates] = useState([]);
     const [creditPackages, setCreditPackages] = useState([]);
     const [speedTiers, setSpeedTiers] = useState([]);
-    const [systemSettings, setSystemSettings] = useState({ disableFreeGeneration: false, disableAllGeneration: false });
+    const [systemSettings, setSystemSettings] = useState({
+        disableFreeGeneration: false,
+        disableAllGeneration: false,
+        enableMonthlyFreeCredits: true,
+        monthlyFreeCreditsAmount: 10
+    });
     const [orders, setOrders] = useState([]);
     const [users, setUsers] = useState([]);
     const [saved, setSaved] = useState(false);
@@ -1200,6 +1205,49 @@ const AdminPage = () => {
                                         }}></span>
                                     </span>
                                 </label>
+                            </div>
+
+                            <div className="admin-setting-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-xl) 0', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                <div style={{ flex: 1, paddingRight: 'var(--space-xl)' }}>
+                                    <strong style={{ display: 'block', fontSize: '1.1rem', marginBottom: '4px', color: '#10b981' }}>Monthly Free Credits</strong>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Users log in to receive this amount each new month.</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Amount</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={systemSettings.monthlyFreeCreditsAmount}
+                                            onChange={(e) => {
+                                                const val = parseInt(e.target.value) || 0;
+                                                const newSettings = { ...systemSettings, monthlyFreeCreditsAmount: val };
+                                                setSystemSettings(newSettings);
+                                                updateSystemSettings(newSettings).then(() => showSaved());
+                                            }}
+                                            style={{ width: '70px', padding: '6px', textAlign: 'center', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px' }}
+                                        />
+                                    </div>
+                                    <label className="admin-switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '28px', marginTop: '20px' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={systemSettings.enableMonthlyFreeCredits}
+                                            onChange={() => handleSystemSettingToggle('enableMonthlyFreeCredits')}
+                                            style={{ opacity: 0, width: 0, height: 0 }}
+                                        />
+                                        <span className="slider round" style={{
+                                            position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                                            backgroundColor: systemSettings.enableMonthlyFreeCredits ? '#10b981' : 'rgba(255,255,255,0.2)',
+                                            transition: '.4s', borderRadius: '34px'
+                                        }}>
+                                            <span style={{
+                                                position: 'absolute', height: '20px', width: '20px', left: '4px', bottom: '4px',
+                                                backgroundColor: 'white', transition: '.4s', borderRadius: '50%',
+                                                transform: systemSettings.enableMonthlyFreeCredits ? 'translateX(22px)' : 'none'
+                                            }}></span>
+                                        </span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
