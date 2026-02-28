@@ -1,18 +1,36 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getTemplates } from '../data/templateData';
-import { getPendingOrders } from '../utils/orders';
+import { getPendingOrdersByUser } from '../utils/orders';
+import { useAuth } from '../context/AuthContext';
 import './TemplatesPage.css';
 
 const TemplatesPage = () => {
     const navigate = useNavigate();
-    const templates = getTemplates();
+    const { user } = useAuth();
+    const [templates, setTemplates] = useState([]);
     const [selectedId, setSelectedId] = useState(null);
     const [showBlockedPopup, setShowBlockedPopup] = useState(false);
+    const [hasActiveRequest, setHasActiveRequest] = useState(false);
+    const [loading, setLoading] = useState(true);
 
-    // Check if user has an active/pending request
-    const pendingOrders = getPendingOrders();
-    const hasActiveRequest = pendingOrders.length > 0;
+    useEffect(() => {
+        const loadData = async () => {
+            setLoading(true);
+            try {
+                const [tmpl, pending] = await Promise.all([
+                    getTemplates(),
+                    user ? getPendingOrdersByUser(user.uid) : Promise.resolve([])
+                ]);
+                setTemplates(tmpl);
+                setHasActiveRequest(pending.length > 0);
+            } catch (error) {
+                console.error('Error loading templates:', error);
+            }
+            setLoading(false);
+        };
+        loadData();
+    }, [user]);
 
     const handleNext = () => {
         if (hasActiveRequest) {
@@ -31,6 +49,19 @@ const TemplatesPage = () => {
         }
         return { regular: template.baseCost, current: template.baseCost, hasOffer: false };
     };
+
+    if (loading) {
+        return (
+            <div className="templates-page page">
+                <div className="container">
+                    <div className="gen-empty animate-fade-in">
+                        <div className="gen-waiting-spinner"></div>
+                        <p>Loading templates...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="templates-page page">

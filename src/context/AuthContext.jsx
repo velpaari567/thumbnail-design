@@ -1,78 +1,93 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { FREE_MONTHLY_CREDITS, ADMIN_EMAIL } from '../data/pricingData';
-import { getUserCredits, saveUserCredits } from '../utils/credits';
-import { registerUser } from '../utils/users';
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, googleProvider, db } from '../firebase';
+
+const ADMIN_EMAIL = 'tempomailis001@gmail.com';
 
 const AuthContext = createContext(null);
 
-export const useAuth = () => {
-    const ctx = useContext(AuthContext);
-    if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-    return ctx;
-};
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // Listen for auth state changes (persists across refreshes)
     useEffect(() => {
-        // Check for saved session
-        const saved = localStorage.getItem('auth_user');
-        if (saved) {
-            try {
-                setUser(JSON.parse(saved));
-            } catch { /* ignore */ }
-        }
-        setLoading(false);
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                const userData = {
+                    uid: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    displayName: firebaseUser.displayName,
+                    photoURL: firebaseUser.photoURL,
+                };
+                setUser(userData);
+
+                // Create/update user document in Firestore
+                const userRef = doc(db, 'users', firebaseUser.uid);
+                const userSnap = await getDoc(userRef);
+
+                if (!userSnap.exists()) {
+                    // New user — create with default credits
+                    await setDoc(userRef, {
+                        email: firebaseUser.email,
+                        displayName: firebaseUser.displayName,
+                        photoURL: firebaseUser.photoURL,
+                        credits: { free: 10, pro: 0 },
+                        isAdmin: firebaseUser.email === ADMIN_EMAIL,
+                        createdAt: serverTimestamp(),
+                        lastLoginAt: serverTimestamp(),
+                    });
+                } else {
+                    // Existing user — update last login
+                    await setDoc(userRef, {
+                        displayName: firebaseUser.displayName,
+                        photoURL: firebaseUser.photoURL,
+                        lastLoginAt: serverTimestamp(),
+                    }, { merge: true });
+                }
+            } else {
+                setUser(null);
+            }
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
     }, []);
 
-    // Check and grant monthly free credits
-    useEffect(() => {
-        if (user) {
-            const lastGrant = localStorage.getItem('last_free_credit_grant');
-            const now = new Date();
-            const currentMonth = `${now.getFullYear()}-${now.getMonth()}`;
-
-            if (lastGrant !== currentMonth) {
-                const credits = getUserCredits();
-                credits.free = FREE_MONTHLY_CREDITS;
-                saveUserCredits(credits);
-                localStorage.setItem('last_free_credit_grant', currentMonth);
-            }
-        }
-    }, [user]);
-
     const signInWithGoogle = async () => {
-        // Mock Google sign-in for development
-        // Replace with Firebase Auth later
-        const mockUser = {
-            email: 'user@gmail.com',
-            displayName: 'Demo User',
-            photoURL: null,
-            uid: 'mock-uid-12345'
-        };
-
-        setUser(mockUser);
-        localStorage.setItem('auth_user', JSON.stringify(mockUser));
-        registerUser(mockUser);
-
-        // Initialize credits if first time
-        if (!localStorage.getItem('user_credits')) {
-            saveUserCredits({ free: FREE_MONTHLY_CREDITS, pro: 0 });
+        try {
+            const result = await signInWithPopup(auth, googleProvider);
+            return result.user;
+        } catch (error) {
+            console.error('Sign-in error:', error);
+            throw error;
         }
-
-        return mockUser;
     };
 
-    const signOut = () => {
-        setUser(null);
-        localStorage.removeItem('auth_user');
+    const logout = async () => {
+        try {
+            await signOut(auth);
+            setUser(null);
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
     };
 
     const isAdmin = user?.email === ADMIN_EMAIL;
 
+    const value = {
+        user,
+        loading,
+        isAdmin,
+        signInWithGoogle,
+        logout,
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut, isAdmin }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

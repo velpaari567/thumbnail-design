@@ -8,21 +8,33 @@ const TimingPage = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const templateId = searchParams.get('template');
-    const [selectedSpeed, setSelectedSpeed] = useState('speed-60');
-    const speedTiers = getSpeedTiers();
+    const [selectedSpeed, setSelectedSpeed] = useState(null);
+    const [speedTiers, setSpeedTiers] = useState([]);
     const [template, setTemplate] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!templateId) {
-            navigate('/templates');
-            return;
-        }
-        const t = getTemplateById(templateId);
-        if (!t) {
-            navigate('/templates');
-            return;
-        }
-        setTemplate(t);
+        const loadData = async () => {
+            if (!templateId) {
+                navigate('/templates');
+                return;
+            }
+            const [t, tiers] = await Promise.all([
+                getTemplateById(templateId),
+                getSpeedTiers()
+            ]);
+            if (!t) {
+                navigate('/templates');
+                return;
+            }
+            setTemplate(t);
+            setSpeedTiers(tiers);
+            // Default to second tier if available
+            if (tiers.length > 1) setSelectedSpeed(tiers[1].id);
+            else if (tiers.length > 0) setSelectedSpeed(tiers[0].id);
+            setLoading(false);
+        };
+        loadData();
     }, [templateId, navigate]);
 
     const handleNext = () => {
@@ -33,7 +45,7 @@ const TimingPage = () => {
         navigate(`/payment?template=${templateId}`);
     };
 
-    if (!template) return null;
+    if (loading || !template) return null;
 
     return (
         <div className="timing-page page">
@@ -79,9 +91,6 @@ const TimingPage = () => {
                                     <span className="timing-extra">+{tier.extraCredits} credits</span>
                                 )}
                             </div>
-                            {tier.id === 'speed-60' && (
-                                <div className="timing-tag">Recommended</div>
-                            )}
                         </div>
                     ))}
                 </div>

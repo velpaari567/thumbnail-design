@@ -1,4 +1,8 @@
-// Pricing and credit store configuration
+// Pricing data with Firestore persistence
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+
+const ADMIN_EMAIL = 'tempomailis001@gmail.com';
 
 const defaultCreditPackages = [
     {
@@ -44,57 +48,71 @@ const defaultCreditPackages = [
 ];
 
 const defaultSpeedTiers = [
-    {
-        id: 'speed-60',
-        label: '1 Hour',
-        minutes: 60,
-        extraCredits: 0,
-        description: 'Standard delivery',
-        icon: '⏰'
-    },
-    {
-        id: 'speed-30',
-        label: '30 Minutes',
-        minutes: 30,
-        extraCredits: 5,
-        description: 'Fast delivery',
-        icon: '⚡'
-    },
-    {
-        id: 'speed-15',
-        label: '15 Minutes',
-        minutes: 15,
-        extraCredits: 15,
-        description: 'Express delivery',
-        icon: '🚀'
-    }
+    { id: 'speed-1', label: '⚡ Express', description: 'Under 15 minutes', minutes: 15, extraCredits: 10 },
+    { id: 'speed-2', label: '🔥 Fast', description: 'Under 1 hour', minutes: 60, extraCredits: 5 },
+    { id: 'speed-3', label: '⏰ Standard', description: 'Under 6 hours', minutes: 360, extraCredits: 0 },
+    { id: 'speed-4', label: '🌙 Relaxed', description: 'Under 24 hours', minutes: 1440, extraCredits: 0 }
 ];
 
-export const getCreditPackages = () => {
-    const saved = localStorage.getItem('admin_credit_packages');
-    if (saved) {
-        try { return JSON.parse(saved); } catch { return defaultCreditPackages; }
+const CONFIG_DOC_ID = 'pricing';
+
+export const getCreditPackages = async () => {
+    try {
+        const docRef = doc(db, 'config', CONFIG_DOC_ID);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists() && docSnap.data().creditPackages) {
+            return docSnap.data().creditPackages;
+        }
+
+        // First run — save defaults
+        await setDoc(docRef, {
+            creditPackages: defaultCreditPackages,
+            speedTiers: defaultSpeedTiers
+        }, { merge: true });
+        return defaultCreditPackages;
+    } catch (error) {
+        console.error('Error getting credit packages:', error);
+        return defaultCreditPackages;
     }
-    return defaultCreditPackages;
 };
 
-export const saveCreditPackages = (packages) => {
-    localStorage.setItem('admin_credit_packages', JSON.stringify(packages));
-};
-
-export const getSpeedTiers = () => {
-    const saved = localStorage.getItem('admin_speed_tiers');
-    if (saved) {
-        try { return JSON.parse(saved); } catch { return defaultSpeedTiers; }
+export const saveCreditPackages = async (packages) => {
+    try {
+        const docRef = doc(db, 'config', CONFIG_DOC_ID);
+        await setDoc(docRef, { creditPackages: packages }, { merge: true });
+    } catch (error) {
+        console.error('Error saving credit packages:', error);
     }
-    return defaultSpeedTiers;
 };
 
-export const saveSpeedTiers = (tiers) => {
-    localStorage.setItem('admin_speed_tiers', JSON.stringify(tiers));
+export const getSpeedTiers = async () => {
+    try {
+        const docRef = doc(db, 'config', CONFIG_DOC_ID);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists() && docSnap.data().speedTiers) {
+            return docSnap.data().speedTiers;
+        }
+
+        await setDoc(docRef, {
+            creditPackages: defaultCreditPackages,
+            speedTiers: defaultSpeedTiers
+        }, { merge: true });
+        return defaultSpeedTiers;
+    } catch (error) {
+        console.error('Error getting speed tiers:', error);
+        return defaultSpeedTiers;
+    }
 };
 
-// Free credits given monthly  
-export const FREE_MONTHLY_CREDITS = 5;
+export const saveSpeedTiers = async (tiers) => {
+    try {
+        const docRef = doc(db, 'config', CONFIG_DOC_ID);
+        await setDoc(docRef, { speedTiers: tiers }, { merge: true });
+    } catch (error) {
+        console.error('Error saving speed tiers:', error);
+    }
+};
 
-export const ADMIN_EMAIL = 'admin@thumbnail.ai';
+export { ADMIN_EMAIL };

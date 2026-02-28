@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTemplateById } from '../data/templateData';
-import { getUserCredits, getTotalCredits, deductCredits } from '../utils/credits';
+import { getUserCredits, deductCredits } from '../utils/credits';
 import { startTimer } from '../utils/timer';
 import { saveOrder } from '../utils/orders';
 import { useAuth } from '../context/AuthContext';
@@ -14,62 +14,66 @@ const PaymentPage = () => {
     const templateId = searchParams.get('template');
     const [order, setOrder] = useState(null);
     const [template, setTemplate] = useState(null);
-    const [credits, setCredits] = useState(getUserCredits());
+    const [credits, setCredits] = useState({ free: 0, pro: 0 });
     const [processing, setProcessing] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!templateId) {
-            navigate('/templates');
-            return;
-        }
-        const t = getTemplateById(templateId);
-        if (!t) {
-            navigate('/templates');
-            return;
-        }
-        setTemplate(t);
+        const loadData = async () => {
+            if (!templateId) {
+                navigate('/templates');
+                return;
+            }
+            const t = await getTemplateById(templateId);
+            if (!t) {
+                navigate('/templates');
+                return;
+            }
+            setTemplate(t);
 
-        const savedOrder = sessionStorage.getItem('thumbnail_order');
-        if (!savedOrder) {
-            navigate('/templates');
-            return;
-        }
-        setOrder(JSON.parse(savedOrder));
-    }, [templateId, navigate]);
+            const savedOrder = sessionStorage.getItem('thumbnail_order');
+            if (!savedOrder) {
+                navigate('/templates');
+                return;
+            }
+            setOrder(JSON.parse(savedOrder));
 
-    if (!order || !template) return null;
+            if (user) {
+                const creds = await getUserCredits(user.uid);
+                setCredits(creds);
+            }
+            setLoading(false);
+        };
+        loadData();
+    }, [templateId, navigate, user]);
 
-    const baseCost = order.baseCost || template.baseCost;
+    if (loading || !order || !template) return null;
+
+    // Use offerCost if available, otherwise baseCost
+    const effectiveCost = (template.offerCost && template.offerCost > 0 && template.offerCost < template.baseCost)
+        ? template.offerCost : template.baseCost;
     const speedExtra = order.speedTier?.extraCredits || 0;
-    const totalCost = baseCost + speedExtra;
-    const totalCredits = getTotalCredits();
+    const totalCost = effectiveCost + speedExtra;
+    const totalCredits = (credits.free || 0) + (credits.pro || 0);
     const hasEnough = totalCredits >= totalCost;
 
-    const handleGenerate = () => {
-        if (!hasEnough || processing) return;
+    const handleGenerate = async () => {
+        if (!hasEnough || processing || !user) return;
 
         setProcessing(true);
 
         // Deduct credits
-        const result = deductCredits(totalCost);
-        if (!result.success) {
+        const result = await deductCredits(user.uid, totalCost);
+        if (!result) {
             setProcessing(false);
             return;
         }
 
-        // Start timer with template info for the generation page
-        const orderId = `order-${Date.now()}`;
-        const durationMinutes = order.speedTier?.minutes || 60;
-        startTimer(orderId, durationMinutes, {
-            icon: template.icon,
-            previewColor: template.previewColor,
-            name: template.name
-        });
-
-        // Save full order to the orders system (for admin panel)
-        saveOrder(orderId, {
-            userEmail: user?.email || 'user@gmail.com',
-            userName: user?.displayName || 'Demo User',
+        // Save full order to Firestore (for admin panel)
+        const savedOrder = await saveOrder(`order-${Date.now()}`, {
+            userUid: user.uid,
+            userEmail: user.email,
+            userName: user.displayName,
             templateId: template.id,
             templateName: template.name,
             templateIcon: template.icon,
@@ -77,16 +81,29 @@ const PaymentPage = () => {
             texts: order.texts || {},
             photos: order.photos || [],
             speedTier: order.speedTier,
-            baseCost: baseCost,
+            baseCost: effectiveCost,
             totalCost: totalCost
         });
 
+        if (!savedOrder) {
+            setProcessing(false);
+            return;
+        }
+
+        // Start local timer with template info for the generation page
+        const durationMinutes = order.speedTier?.minutes || 60;
+        startTimer(savedOrder.id, durationMinutes, {
+            icon: template.icon,
+            previewColor: template.previewColor,
+            name: template.name
+        });
+
         // Save active order ID (localStorage so it persists across refresh)
-        localStorage.setItem('active_order_id', orderId);
+        localStorage.setItem('active_order_id', savedOrder.id);
 
         // Redirect to generation page
         setTimeout(() => {
-            navigate(`/generating?order=${orderId}`);
+            navigate(`/generating?order=${savedOrder.id}`);
         }, 800);
     };
 
@@ -121,7 +138,7 @@ const PaymentPage = () => {
                                     <div className="payment-item-desc">Base thumbnail creation</div>
                                 </div>
                             </div>
-                            <div className="payment-item-cost">{baseCost} credits</div>
+                            <div className="payment-item-cost">{effectiveCost} credits</div>
                         </div>
 
                         <div className="payment-item">

@@ -705,3 +705,190 @@
         flex-wrap: wrap;
     }
 }
+
+/* Payment Requests */
+.admin-payment-pending {
+    border-left: 3px solid #f59e0b;
+}
+
+.admin-payment-details {
+    padding: var(--space-md) var(--space-lg) var(--space-lg);
+    border-top: 1px solid var(--border-color);
+}
+
+.admin-payment-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+.admin-payment-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--space-sm);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+.admin-payment-info-label {
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.admin-payment-info-value {
+    font-size: var(--font-sm);
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.admin-payment-actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.admin-approve-btn {
+    flex: 1;
+}
+
+.admin-reject-btn {
+    color: #ef4444 !important;
+    border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+.admin-reject-btn:hover {
+    background: rgba(239, 68, 68, 0.1) !important;
+}
+
+.admin-payment-approved-note {
+    padding: var(--space-sm) var(--space-md);
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: var(--radius-sm);
+    color: #10b981;
+    font-size: var(--font-sm);
+    font-weight: 500;
+}
+
+.admin-payment-rejected-note {
+    padding: var(--space-sm) var(--space-md);
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: var(--radius-sm);
+    color: #ef4444;
+    font-size: var(--font-sm);
+    font-weight: 500;
+}
+
+@media (max-width: 640px) {
+    .admin-payment-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-payment-actions {
+        flex-direction: column;
+    }
+}
+
+/* Offer Management */
+.admin-offer-form {
+    padding: var(--space-lg);
+    margin-bottom: var(--space-lg);
+}
+
+.admin-offer-form h3 {
+    margin-bottom: var(--space-md);
+}
+
+.admin-offer-form-grid {
+    display: flex;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+
+.admin-offer-form-grid .admin-field {
+    flex: 1;
+}
+
+.admin-offer-form textarea {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: var(--space-sm);
+    font-family: inherit;
+    font-size: var(--font-sm);
+}
+
+.admin-offer-form select {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: var(--space-sm);
+    font-size: var(--font-sm);
+    width: 100%;
+}
+
+.admin-offer-form-actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+}
+
+.admin-offer-meta {
+    padding: var(--space-sm) var(--space-lg) var(--space-md);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.admin-offer-dates {
+    display: flex;
+    gap: var(--space-md);
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+}
+
+.admin-offer-actions {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.admin-offer-card-active {
+    border-left: 3px solid #10b981;
+}
+
+.admin-offer-card-upcoming {
+    border-left: 3px solid #f59e0b;
+}
+
+.admin-offer-card-expired {
+    border-left: 3px solid #ef4444;
+    opacity: 0.6;
+}
+
+.admin-offer-card-inactive {
+    border-left: 3px solid #6b7280;
+    opacity: 0.5;
+}
+
+@media (max-width: 640px) {
+    .admin-offer-form-grid {
+        flex-direction: column;
+    }
+
+    .admin-offer-meta {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .admin-offer-dates {
+        flex-direction: column;
+        gap: var(--space-xs);
+    }
+}

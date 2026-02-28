@@ -1,29 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCreditPackages } from '../data/pricingData';
 import { addCredits, getUserCredits } from '../utils/credits';
+import { useAuth } from '../context/AuthContext';
 import './CreditStorePage.css';
 
 const CreditStorePage = () => {
     const navigate = useNavigate();
-    const packages = getCreditPackages();
-    const [credits, setCredits] = useState(getUserCredits());
+    const { user } = useAuth();
+    const [packages, setPackages] = useState([]);
+    const [credits, setCredits] = useState({ free: 0, pro: 0 });
     const [purchasedId, setPurchasedId] = useState(null);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                const [pkgs, creds] = await Promise.all([
+                    getCreditPackages(),
+                    user ? getUserCredits(user.uid) : Promise.resolve({ free: 0, pro: 0 })
+                ]);
+                setPackages(pkgs);
+                setCredits(creds);
+            } catch (error) {
+                console.error('Error loading credit store:', error);
+            }
+            setLoading(false);
+        };
+        loadData();
+    }, [user]);
 
     const handleBuy = (pkg) => {
-        // Mock purchase — in production, integrate with payment gateway
-        setPurchasedId(pkg.id);
-
-        setTimeout(() => {
-            const updated = addCredits(pkg.credits, 'pro');
-            setCredits(updated);
-            setPurchasedId(null);
-            setShowSuccess(true);
-
-            setTimeout(() => setShowSuccess(false), 3000);
-        }, 1200);
+        if (!user) return;
+        const effectivePrice = (pkg.salePrice && pkg.salePrice > 0 && pkg.salePrice < pkg.price) ? pkg.salePrice : pkg.price;
+        const params = new URLSearchParams({
+            credits: pkg.credits,
+            amount: effectivePrice,
+            currency: pkg.currency,
+            packageId: pkg.id,
+            label: pkg.label
+        });
+        navigate(`/pay?${params.toString()}`);
     };
+
+    if (loading) {
+        return (
+            <div className="credits-page page">
+                <div className="container">
+                    <div className="gen-empty animate-fade-in">
+                        <div className="gen-waiting-spinner"></div>
+                        <p>Loading store...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="credits-page page">
@@ -52,7 +84,7 @@ const CreditStorePage = () => {
                             <span className="badge badge-pro">PRO</span>
                             <span className="credits-balance-num">{credits.pro}</span>
                             <span className="credits-balance-separator">=</span>
-                            <span className="credits-balance-total">{credits.free + credits.pro}</span>
+                            <span className="credits-balance-total">{(credits.free || 0) + (credits.pro || 0)}</span>
                         </div>
                     </div>
                 </div>

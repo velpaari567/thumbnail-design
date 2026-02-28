@@ -1,50 +1,71 @@
-// Credit management utilities
+// Credits management via Firestore
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
-export const getUserCredits = () => {
-    const saved = localStorage.getItem('user_credits');
-    if (saved) {
-        try { return JSON.parse(saved); } catch { /* fall through */ }
+export const getUserCredits = async (uid) => {
+    if (!uid) return { free: 0, pro: 0 };
+
+    try {
+        const userRef = doc(db, 'users', uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+            return userSnap.data().credits || { free: 0, pro: 0 };
+        }
+        return { free: 0, pro: 0 };
+    } catch (error) {
+        console.error('Error getting credits:', error);
+        return { free: 0, pro: 0 };
     }
-    return { free: 5, pro: 0 };
 };
 
-export const saveUserCredits = (credits) => {
-    localStorage.setItem('user_credits', JSON.stringify(credits));
-};
+export const addCredits = async (uid, amount, type = 'pro') => {
+    if (!uid) return;
 
-export const getTotalCredits = () => {
-    const credits = getUserCredits();
-    return credits.free + credits.pro;
-};
+    try {
+        const userRef = doc(db, 'users', uid);
+        const userSnap = await getDoc(userRef);
 
-export const deductCredits = (amount) => {
-    const credits = getUserCredits();
-    const total = credits.free + credits.pro;
-
-    if (total < amount) {
-        return { success: false, message: 'Insufficient credits' };
+        if (userSnap.exists()) {
+            const currentCredits = userSnap.data().credits || { free: 0, pro: 0 };
+            currentCredits[type] = (currentCredits[type] || 0) + amount;
+            await updateDoc(userRef, { credits: currentCredits });
+            return currentCredits;
+        }
+    } catch (error) {
+        console.error('Error adding credits:', error);
     }
-
-    // Deduct from free credits first, then pro
-    let remaining = amount;
-
-    if (credits.free >= remaining) {
-        credits.free -= remaining;
-        remaining = 0;
-    } else {
-        remaining -= credits.free;
-        credits.free = 0;
-        credits.pro -= remaining;
-        remaining = 0;
-    }
-
-    saveUserCredits(credits);
-    return { success: true, credits };
 };
 
-export const addCredits = (amount, type = 'pro') => {
-    const credits = getUserCredits();
-    credits[type] += amount;
-    saveUserCredits(credits);
-    return credits;
+export const deductCredits = async (uid, amount) => {
+    if (!uid) return false;
+
+    try {
+        const userRef = doc(db, 'users', uid);
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) return false;
+
+        const credits = userSnap.data().credits || { free: 0, pro: 0 };
+        const totalAvailable = (credits.free || 0) + (credits.pro || 0);
+
+        if (totalAvailable < amount) return false;
+
+        let remaining = amount;
+
+        // Deduct from free first, then pro
+        if (credits.free >= remaining) {
+            credits.free -= remaining;
+        } else {
+            remaining -= credits.free;
+            credits.free = 0;
+            credits.pro -= remaining;
+        }
+
+        await updateDoc(userRef, { credits });
+        return true;
+    } catch (error) {
+        console.error('Error deducting credits:', error);
+        return false;
+    }
 };

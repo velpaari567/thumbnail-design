@@ -13,23 +13,26 @@ const RequirementsPage = () => {
     const [texts, setTexts] = useState({});
 
     useEffect(() => {
-        if (!templateId) {
-            navigate('/templates');
-            return;
-        }
-        const t = getTemplateById(templateId);
-        if (!t) {
-            navigate('/templates');
-            return;
-        }
-        setTemplate(t);
+        const loadTemplate = async () => {
+            if (!templateId) {
+                navigate('/templates');
+                return;
+            }
+            const t = await getTemplateById(templateId);
+            if (!t) {
+                navigate('/templates');
+                return;
+            }
+            setTemplate(t);
 
-        // Initialize text fields
-        const initialTexts = {};
-        t.requirements.texts.forEach(tf => {
-            initialTexts[tf.id] = '';
-        });
-        setTexts(initialTexts);
+            // Initialize text fields
+            const initialTexts = {};
+            t.requirements.texts.forEach(tf => {
+                initialTexts[tf.id] = '';
+            });
+            setTexts(initialTexts);
+        };
+        loadTemplate();
     }, [templateId, navigate]);
 
     const handlePhotoChange = (photoId, file) => {

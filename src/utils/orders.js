@@ -1,5 +1,6 @@
-// Order management utilities
-// Stores all user orders with their data, photos, and delivery status
+// Order management via Firestore
+import { collection, doc, addDoc, getDoc, getDocs, updateDoc, query, where, orderBy, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export const ORDER_STATUS = {
     PENDING: 'pending',
@@ -7,100 +8,149 @@ export const ORDER_STATUS = {
     DELIVERED: 'delivered'
 };
 
-export const saveOrder = (orderId, data) => {
-    const orders = getAllOrders();
-    const order = {
-        id: orderId,
-        userEmail: data.userEmail || 'user@gmail.com',
-        userName: data.userName || 'Demo User',
-        templateId: data.templateId,
-        templateName: data.templateName,
-        templateIcon: data.templateIcon,
-        templatePreviewColor: data.templatePreviewColor,
-        texts: data.texts || {},
-        photos: data.photos || [], // Array of { label, dataUrl }
-        speedTier: data.speedTier,
-        baseCost: data.baseCost,
-        totalCost: data.totalCost,
-        status: ORDER_STATUS.PENDING,
-        createdAt: Date.now(),
-        deliveredAt: null,
-        deliveredThumbnail: null, // base64 of the finished thumbnail
-        seen: false // whether user has seen the delivered result
-    };
-    orders.push(order);
-    localStorage.setItem('all_orders', JSON.stringify(orders));
-    return order;
-};
+export const saveOrder = async (orderId, data) => {
+    try {
+        const orderData = {
+            userUid: data.userUid || '',
+            userEmail: data.userEmail || '',
+            userName: data.userName || '',
+            templateId: data.templateId,
+            templateName: data.templateName,
+            templateIcon: data.templateIcon,
+            templatePreviewColor: data.templatePreviewColor,
+            texts: data.texts || {},
+            photos: data.photos || [],
+            speedTier: data.speedTier,
+            baseCost: data.baseCost,
+            totalCost: data.totalCost,
+            status: ORDER_STATUS.PENDING,
+            createdAt: Date.now(),
+            deliveredAt: null,
+            deliveredThumbnail: null,
+            visibleAt: null,
+            seen: false
+        };
 
-export const getAllOrders = () => {
-    const saved = localStorage.getItem('all_orders');
-    if (saved) {
-        try { return JSON.parse(saved); } catch { return []; }
+        const docRef = await addDoc(collection(db, 'orders'), orderData);
+        return { id: docRef.id, ...orderData };
+    } catch (error) {
+        console.error('Error saving order:', error);
+        return null;
     }
-    return [];
 };
 
-export const getOrderById = (orderId) => {
-    const orders = getAllOrders();
-    return orders.find(o => o.id === orderId);
+export const getAllOrders = async () => {
+    try {
+        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (error) {
+        console.error('Error getting orders:', error);
+        return [];
+    }
 };
 
-export const getPendingOrders = () => {
-    return getAllOrders().filter(o => o.status !== ORDER_STATUS.DELIVERED);
+export const getOrderById = async (orderId) => {
+    try {
+        const docRef = doc(db, 'orders', orderId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return { id: docSnap.id, ...docSnap.data() };
+        }
+        return null;
+    } catch (error) {
+        console.error('Error getting order:', error);
+        return null;
+    }
 };
 
-export const getDeliveredOrders = () => {
-    return getAllOrders().filter(o => o.status === ORDER_STATUS.DELIVERED);
+export const getPendingOrdersByUser = async (userUid) => {
+    try {
+        const q = query(
+            collection(db, 'orders'),
+            where('userUid', '==', userUid),
+            where('status', 'in', [ORDER_STATUS.PENDING, ORDER_STATUS.IN_PROGRESS])
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (error) {
+        console.error('Error getting pending orders:', error);
+        return [];
+    }
 };
 
-export const deliverOrder = (orderId, thumbnailBase64, delayMinutes = 0) => {
-    const orders = getAllOrders();
-    const index = orders.findIndex(o => o.id === orderId);
-    if (index === -1) return false;
-
-    const now = Date.now();
-    const visibleAt = delayMinutes > 0 ? now + (delayMinutes * 60 * 1000) : now;
-
-    orders[index] = {
-        ...orders[index],
-        status: ORDER_STATUS.DELIVERED,
-        deliveredAt: now,
-        deliveredThumbnail: thumbnailBase64,
-        visibleAt: visibleAt,
-        seen: false
-    };
-    localStorage.setItem('all_orders', JSON.stringify(orders));
-    return true;
+export const getDeliveredOrders = async () => {
+    try {
+        const q = query(
+            collection(db, 'orders'),
+            where('status', '==', ORDER_STATUS.DELIVERED)
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (error) {
+        console.error('Error getting delivered orders:', error);
+        return [];
+    }
 };
 
-export const markOrderSeen = (orderId) => {
-    const orders = getAllOrders();
-    const index = orders.findIndex(o => o.id === orderId);
-    if (index === -1) return;
+export const deliverOrder = async (orderId, thumbnailBase64, delayMinutes = 0) => {
+    try {
+        const orderRef = doc(db, 'orders', orderId);
+        const now = Date.now();
+        const visibleAt = delayMinutes > 0 ? now + (delayMinutes * 60 * 1000) : now;
 
-    orders[index] = { ...orders[index], seen: true };
-    localStorage.setItem('all_orders', JSON.stringify(orders));
+        await updateDoc(orderRef, {
+            status: ORDER_STATUS.DELIVERED,
+            deliveredAt: now,
+            deliveredThumbnail: thumbnailBase64,
+            visibleAt: visibleAt,
+            seen: false
+        });
+        return true;
+    } catch (error) {
+        console.error('Error delivering order:', error);
+        return false;
+    }
+};
+
+export const markOrderSeen = async (orderId) => {
+    try {
+        const orderRef = doc(db, 'orders', orderId);
+        await updateDoc(orderRef, { seen: true });
+    } catch (error) {
+        console.error('Error marking order seen:', error);
+    }
 };
 
 export const isOrderVisible = (order) => {
     if (!order || order.status !== ORDER_STATUS.DELIVERED) return false;
     const now = Date.now();
-    // If visibleAt is not set (older orders), treat as immediately visible
     return !order.visibleAt || now >= order.visibleAt;
 };
 
-export const getUnseenDeliveredOrders = () => {
-    return getAllOrders().filter(o =>
-        o.status === ORDER_STATUS.DELIVERED && !o.seen && isOrderVisible(o)
-    );
+export const getUnseenDeliveredOrders = async (userUid) => {
+    try {
+        const q = query(
+            collection(db, 'orders'),
+            where('userUid', '==', userUid),
+            where('status', '==', ORDER_STATUS.DELIVERED),
+            where('seen', '==', false)
+        );
+        const snapshot = await getDocs(q);
+        const orders = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Filter by visibility client-side
+        return orders.filter(o => isOrderVisible(o));
+    } catch (error) {
+        console.error('Error getting unseen orders:', error);
+        return [];
+    }
 };
 
-export const updateOrderStatus = (orderId, status) => {
-    const orders = getAllOrders();
-    const index = orders.findIndex(o => o.id === orderId);
-    if (index === -1) return;
-
-    orders[index] = { ...orders[index], status };
-    localStorage.setItem('all_orders', JSON.stringify(orders));
+export const updateOrderStatus = async (orderId, status) => {
+    try {
+        const orderRef = doc(db, 'orders', orderId);
+        await updateDoc(orderRef, { status });
+    } catch (error) {
+        console.error('Error updating order status:', error);
+    }
 };

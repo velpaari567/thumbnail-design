@@ -4,66 +4,109 @@ import { useAuth } from '../context/AuthContext';
 import { getTemplates, saveTemplates } from '../data/templateData';
 import { getCreditPackages, saveCreditPackages, getSpeedTiers, saveSpeedTiers } from '../data/pricingData';
 import { getAllOrders, deliverOrder } from '../utils/orders';
-import { getUsersWithCredits } from '../utils/users';
+import { getAllPaymentRequests, approvePaymentRequest, rejectPaymentRequest } from '../utils/payments';
+import { getOffers, saveOffer, deleteOffer } from '../utils/offers';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 import './AdminPage.css';
 
 const AdminPage = () => {
     const { isAdmin } = useAuth();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('orders');
-    const [templates, setTemplates] = useState(getTemplates());
-    const [creditPackages, setCreditPackages] = useState(getCreditPackages());
-    const [speedTiers, setSpeedTiers] = useState(getSpeedTiers());
-    const [orders, setOrders] = useState(getAllOrders());
-    const [users, setUsers] = useState(getUsersWithCredits());
+    const [templates, setTemplates] = useState([]);
+    const [creditPackages, setCreditPackages] = useState([]);
+    const [speedTiers, setSpeedTiers] = useState([]);
+    const [orders, setOrders] = useState([]);
+    const [users, setUsers] = useState([]);
     const [saved, setSaved] = useState(false);
     const [expandedOrder, setExpandedOrder] = useState(null);
     const [deliveryFile, setDeliveryFile] = useState(null);
     const [deliveryPreview, setDeliveryPreview] = useState(null);
     const [delivering, setDelivering] = useState(false);
     const [deliveryDelay, setDeliveryDelay] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [paymentRequests, setPaymentRequests] = useState([]);
+    const [processingPayment, setProcessingPayment] = useState(null);
+    const [allOffers, setAllOffers] = useState([]);
+    const [editingOffer, setEditingOffer] = useState(null);
     const firstLoad = useRef(true);
     const fileInputRef = useRef(null);
 
+    // Initial data load
     useEffect(() => {
-        if (!isAdmin) {
-            // For demo purposes, allow access
-        }
-    }, [isAdmin, navigate]);
+        const loadData = async () => {
+            try {
+                const [tmpl, pkgs, tiers, allOrders, payments, offers] = await Promise.all([
+                    getTemplates(),
+                    getCreditPackages(),
+                    getSpeedTiers(),
+                    getAllOrders(),
+                    getAllPaymentRequests(),
+                    getOffers()
+                ]);
+                setTemplates(tmpl);
+                setCreditPackages(pkgs);
+                setSpeedTiers(tiers);
+                setOrders(allOrders);
+                setPaymentRequests(payments);
+                setAllOffers(offers);
+
+                // Get users from Firestore
+                const usersSnap = await getDocs(collection(db, 'users'));
+                const usersList = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+                setUsers(usersList);
+
+                setLoading(false);
+                // Allow auto-save after initial load
+                setTimeout(() => { firstLoad.current = false; }, 500);
+            } catch (error) {
+                console.error('Error loading admin data:', error);
+                setLoading(false);
+            }
+        };
+        loadData();
+    }, []);
 
     // Refresh orders and users periodically
     useEffect(() => {
-        const interval = setInterval(() => {
-            setOrders(getAllOrders());
-            setUsers(getUsersWithCredits());
+        const interval = setInterval(async () => {
+            try {
+                const [allOrders, payments] = await Promise.all([
+                    getAllOrders(),
+                    getAllPaymentRequests()
+                ]);
+                setOrders(allOrders);
+                setPaymentRequests(payments);
+                const usersSnap = await getDocs(collection(db, 'users'));
+                setUsers(usersSnap.docs.map(d => ({ uid: d.id, ...d.data() })));
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+            }
         }, 5000);
         return () => clearInterval(interval);
     }, []);
 
     // Auto-save templates
     useEffect(() => {
-        if (firstLoad.current) return;
+        if (firstLoad.current || templates.length === 0) return;
         saveTemplates(templates);
         showSaved();
     }, [templates]);
 
     // Auto-save credit packages
     useEffect(() => {
-        if (firstLoad.current) return;
+        if (firstLoad.current || creditPackages.length === 0) return;
         saveCreditPackages(creditPackages);
         showSaved();
     }, [creditPackages]);
 
     // Auto-save speed tiers
     useEffect(() => {
-        if (firstLoad.current) return;
+        if (firstLoad.current || speedTiers.length === 0) return;
         saveSpeedTiers(speedTiers);
         showSaved();
     }, [speedTiers]);
-
-    useEffect(() => {
-        firstLoad.current = false;
-    }, []);
 
     const showSaved = () => {
         setSaved(true);
@@ -141,14 +184,15 @@ const AdminPage = () => {
         }
     };
 
-    const handleDeliver = (orderId) => {
+    const handleDeliver = async (orderId) => {
         if (!deliveryPreview || delivering) return;
         setDelivering(true);
 
-        deliverOrder(orderId, deliveryPreview, deliveryDelay);
+        await deliverOrder(orderId, deliveryPreview, deliveryDelay);
 
         // Refresh orders
-        setOrders(getAllOrders());
+        const refreshed = await getAllOrders();
+        setOrders(refreshed);
         setExpandedOrder(null);
         setDeliveryFile(null);
         setDeliveryPreview(null);
@@ -166,6 +210,29 @@ const AdminPage = () => {
         document.body.removeChild(link);
     };
 
+    const handleApprovePayment = async (req) => {
+        if (processingPayment) return;
+        setProcessingPayment(req.id);
+        const success = await approvePaymentRequest(req.id, req.userUid, req.credits);
+        if (success) {
+            const updated = await getAllPaymentRequests();
+            setPaymentRequests(updated);
+            showSaved();
+        }
+        setProcessingPayment(null);
+    };
+
+    const handleRejectPayment = async (req) => {
+        if (processingPayment) return;
+        setProcessingPayment(req.id);
+        const success = await rejectPaymentRequest(req.id);
+        if (success) {
+            const updated = await getAllPaymentRequests();
+            setPaymentRequests(updated);
+        }
+        setProcessingPayment(null);
+    };
+
     const formatDate = (timestamp) => {
         return new Date(timestamp).toLocaleString('en-IN', {
             day: 'numeric',
@@ -175,6 +242,23 @@ const AdminPage = () => {
             minute: '2-digit'
         });
     };
+
+    if (loading) {
+        return (
+            <div className="admin-page page">
+                <div className="container">
+                    <div className="gen-empty animate-fade-in">
+                        <div className="gen-waiting-spinner"></div>
+                        <p>Loading admin panel...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const pendingOrders = orders.filter(o => o.status !== 'delivered');
+    const deliveredOrders = orders.filter(o => o.status === 'delivered');
+    const pendingPayments = paymentRequests.filter(p => p.status === 'pending');
 
     return (
         <div className="admin-page page">
@@ -194,128 +278,421 @@ const AdminPage = () => {
 
                 {/* Saved Toast */}
                 {saved && (
-                    <div className="credits-toast animate-scale-in" style={{ background: 'var(--success-bg)', borderColor: 'rgba(16,185,129,0.3)', color: 'var(--success)' }}>
-                        ✅ Auto-saved!
+                    <div className="admin-saved-toast animate-scale-in">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="20,6 9,17 4,12" />
+                        </svg>
+                        Saved!
                     </div>
                 )}
 
                 {/* Tabs */}
-                <div className="admin-tabs animate-fade-in">
-                    <button
-                        className={`admin-tab ${activeTab === 'orders' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('orders')}
-                    >
-                        📦 Orders
-                        {orders.filter(o => o.status !== 'delivered').length > 0 && (
-                            <span className="admin-tab-badge">{orders.filter(o => o.status !== 'delivered').length}</span>
-                        )}
-                    </button>
-                    <button
-                        className={`admin-tab ${activeTab === 'users' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('users')}
-                    >
-                        👥 Users ({users.length})
-                    </button>
-                    <button
-                        className={`admin-tab ${activeTab === 'templates' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('templates')}
-                    >
-                        🎨 Templates
-                    </button>
-                    <button
-                        className={`admin-tab ${activeTab === 'credits' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('credits')}
-                    >
-                        💎 Credit Packages
-                    </button>
-                    <button
-                        className={`admin-tab ${activeTab === 'speed' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('speed')}
-                    >
-                        ⚡ Speed Tiers
-                    </button>
+                <div className="admin-tabs animate-fade-in-up stagger-1">
+                    {[
+                        { id: 'payments', label: '💰 Payments', badge: pendingPayments.length || null },
+                        { id: 'orders', label: '📦 Orders', badge: pendingOrders.length || null },
+                        { id: 'offers', label: '🎁 Offers', badge: allOffers.length || null },
+                        { id: 'users', label: '👥 Users', badge: `${users.length}` },
+                        { id: 'templates', label: '🎨 Templates' },
+                        { id: 'packages', label: '💎 Credit Packages' },
+                        { id: 'speed', label: '⚡ Speed Tiers' }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            className={`admin-tab ${activeTab === tab.id ? 'active' : ''}`}
+                            onClick={() => setActiveTab(tab.id)}
+                        >
+                            {tab.label}
+                            {tab.badge && <span className="admin-tab-badge">{tab.badge}</span>}
+                        </button>
+                    ))}
                 </div>
+
+                {/* PAYMENTS TAB */}
+                {activeTab === 'payments' && (
+                    <div className="admin-section animate-fade-in">
+                        <h2>Payment Requests ({pendingPayments.length} pending)</h2>
+
+                        {paymentRequests.length === 0 ? (
+                            <div className="admin-empty glass-card">
+                                <span className="admin-empty-icon">💰</span>
+                                <p>No payment requests yet. They will appear here when users purchase credits.</p>
+                            </div>
+                        ) : (
+                            <div className="admin-orders-list">
+                                {paymentRequests.map(req => (
+                                    <div key={req.id} className={`admin-order-card glass-card ${req.status === 'pending' ? 'admin-payment-pending' : ''}`}>
+                                        <div className="admin-order-header">
+                                            <div className="admin-order-left">
+                                                <div className="admin-order-template-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)' }}>
+                                                    💰
+                                                </div>
+                                                <div>
+                                                    <div className="admin-order-name">
+                                                        {req.packageLabel} — {req.credits} credits
+                                                    </div>
+                                                    <div className="admin-order-user">
+                                                        {req.userName || req.userEmail} · {formatDate(req.createdAt)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="admin-order-right">
+                                                <span className={`admin-order-status status-${req.status}`}>
+                                                    {req.status === 'pending' ? '⏳ Pending' :
+                                                        req.status === 'approved' ? '✅ Approved' : '❌ Rejected'}
+                                                </span>
+                                                <span className="admin-order-cost" style={{ color: '#10b981', fontWeight: 700 }}>
+                                                    {req.currency}{req.amount}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="admin-payment-details">
+                                            <div className="admin-payment-info-grid">
+                                                <div className="admin-payment-info-item">
+                                                    <span className="admin-payment-info-label">User Email</span>
+                                                    <span className="admin-payment-info-value">{req.userEmail}</span>
+                                                </div>
+                                                <div className="admin-payment-info-item">
+                                                    <span className="admin-payment-info-label">Package</span>
+                                                    <span className="admin-payment-info-value">{req.packageLabel}</span>
+                                                </div>
+                                                <div className="admin-payment-info-item">
+                                                    <span className="admin-payment-info-label">Credits</span>
+                                                    <span className="admin-payment-info-value">💎 {req.credits}</span>
+                                                </div>
+                                                <div className="admin-payment-info-item">
+                                                    <span className="admin-payment-info-label">Amount</span>
+                                                    <span className="admin-payment-info-value" style={{ color: '#10b981', fontWeight: 700 }}>{req.currency}{req.amount}</span>
+                                                </div>
+                                            </div>
+
+                                            {req.status === 'pending' && (
+                                                <div className="admin-payment-actions">
+                                                    <button
+                                                        className="btn btn-primary admin-approve-btn"
+                                                        onClick={() => handleApprovePayment(req)}
+                                                        disabled={processingPayment === req.id}
+                                                    >
+                                                        {processingPayment === req.id ? (
+                                                            <><span className="spinner"></span> Processing...</>
+                                                        ) : (
+                                                            <>✅ Approve & Add Credits</>
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-secondary admin-reject-btn"
+                                                        onClick={() => handleRejectPayment(req)}
+                                                        disabled={processingPayment === req.id}
+                                                    >
+                                                        ❌ Reject
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {req.status === 'approved' && (
+                                                <div className="admin-payment-approved-note">
+                                                    ✅ Payment approved — {req.credits} credits added to user's account
+                                                </div>
+                                            )}
+
+                                            {req.status === 'rejected' && (
+                                                <div className="admin-payment-rejected-note">
+                                                    ❌ Payment request rejected
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* OFFERS TAB */}
+                {activeTab === 'offers' && (
+                    <div className="admin-section animate-fade-in">
+                        <div className="admin-orders-filter">
+                            <h2>Manage Offers ({allOffers.length})</h2>
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => setEditingOffer({
+                                    title: '',
+                                    description: '',
+                                    emoji: '🎁',
+                                    type: 'discount',
+                                    startDate: '',
+                                    endDate: '',
+                                    isActive: true
+                                })}
+                                style={{ marginLeft: 'auto' }}
+                            >
+                                + New Offer
+                            </button>
+                        </div>
+
+                        {/* Create / Edit Offer Form */}
+                        {editingOffer && (
+                            <div className="admin-offer-form glass-card">
+                                <h3>{editingOffer.id ? 'Edit Offer' : 'Create New Offer'}</h3>
+                                <div className="admin-offer-form-grid">
+                                    <div className="admin-field">
+                                        <label>Emoji</label>
+                                        <input
+                                            type="text"
+                                            value={editingOffer.emoji}
+                                            onChange={(e) => setEditingOffer({ ...editingOffer, emoji: e.target.value })}
+                                            style={{ width: '60px', textAlign: 'center', fontSize: '1.5rem' }}
+                                        />
+                                    </div>
+                                    <div className="admin-field" style={{ flex: 1 }}>
+                                        <label>Title</label>
+                                        <input
+                                            type="text"
+                                            value={editingOffer.title}
+                                            onChange={(e) => setEditingOffer({ ...editingOffer, title: e.target.value })}
+                                            placeholder="e.g. 50% OFF on all packages!"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="admin-field">
+                                    <label>Description</label>
+                                    <textarea
+                                        value={editingOffer.description}
+                                        onChange={(e) => setEditingOffer({ ...editingOffer, description: e.target.value })}
+                                        placeholder="Describe the offer details..."
+                                        rows={2}
+                                        style={{ width: '100%', resize: 'vertical' }}
+                                    />
+                                </div>
+                                <div className="admin-offer-form-grid">
+                                    <div className="admin-field">
+                                        <label>Start Date & Time</label>
+                                        <input
+                                            type="datetime-local"
+                                            value={editingOffer.startDate}
+                                            onChange={(e) => setEditingOffer({ ...editingOffer, startDate: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="admin-field">
+                                        <label>End Date & Time</label>
+                                        <input
+                                            type="datetime-local"
+                                            value={editingOffer.endDate}
+                                            onChange={(e) => setEditingOffer({ ...editingOffer, endDate: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="admin-offer-form-grid">
+                                    <div className="admin-field">
+                                        <label>Type</label>
+                                        <select
+                                            value={editingOffer.type}
+                                            onChange={(e) => setEditingOffer({ ...editingOffer, type: e.target.value })}
+                                        >
+                                            <option value="discount">💰 Discount</option>
+                                            <option value="bonus">🎁 Bonus Credits</option>
+                                            <option value="special">⭐ Special Offer</option>
+                                            <option value="flash">⚡ Flash Sale</option>
+                                            <option value="seasonal">🎄 Seasonal</option>
+                                        </select>
+                                    </div>
+                                    <div className="admin-field">
+                                        <label className="admin-req-checkbox" style={{ marginTop: '24px' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={editingOffer.isActive}
+                                                onChange={(e) => setEditingOffer({ ...editingOffer, isActive: e.target.checked })}
+                                            />
+                                            Active (visible to users)
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="admin-offer-form-actions">
+                                    <button
+                                        className="btn btn-primary"
+                                        onClick={async () => {
+                                            const saved = await saveOffer(editingOffer);
+                                            if (saved) {
+                                                const updated = await getOffers();
+                                                setAllOffers(updated);
+                                                setEditingOffer(null);
+                                                showSaved();
+                                            }
+                                        }}
+                                    >
+                                        {editingOffer.id ? 'Update Offer' : 'Create Offer'}
+                                    </button>
+                                    <button className="btn btn-secondary" onClick={() => setEditingOffer(null)}>
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Offers List */}
+                        {allOffers.length === 0 && !editingOffer ? (
+                            <div className="admin-empty glass-card">
+                                <span className="admin-empty-icon">🎁</span>
+                                <p>No offers created yet. Click "+ New Offer" to create your first offer!</p>
+                            </div>
+                        ) : (
+                            <div className="admin-orders-list">
+                                {allOffers.map(offer => {
+                                    const now = new Date();
+                                    const start = offer.startDate ? new Date(offer.startDate) : null;
+                                    const end = offer.endDate ? new Date(offer.endDate) : null;
+                                    let status = 'active';
+                                    if (!offer.isActive) status = 'inactive';
+                                    else if (end && end < now) status = 'expired';
+                                    else if (start && start > now) status = 'upcoming';
+
+                                    return (
+                                        <div key={offer.id} className={`admin-order-card glass-card admin-offer-card-${status}`}>
+                                            <div className="admin-order-header">
+                                                <div className="admin-order-left">
+                                                    <div className="admin-order-template-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', fontSize: '1.3rem' }}>
+                                                        {offer.emoji}
+                                                    </div>
+                                                    <div>
+                                                        <div className="admin-order-name">{offer.title}</div>
+                                                        <div className="admin-order-user">
+                                                            {offer.description}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="admin-order-right">
+                                                    <span className={`admin-order-status status-${status}`}>
+                                                        {status === 'active' ? '🟢 Live' :
+                                                            status === 'upcoming' ? '🟡 Upcoming' :
+                                                                status === 'expired' ? '🔴 Expired' : '⚪ Inactive'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="admin-offer-meta">
+                                                <div className="admin-offer-dates">
+                                                    {offer.startDate && (
+                                                        <span>📅 Start: {new Date(offer.startDate).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                    )}
+                                                    {offer.endDate && (
+                                                        <span>🏁 End: {new Date(offer.endDate).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                    )}
+                                                </div>
+                                                <div className="admin-offer-actions">
+                                                    <button
+                                                        className="btn btn-secondary"
+                                                        style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+                                                        onClick={() => setEditingOffer({ ...offer })}
+                                                    >
+                                                        ✏️ Edit
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-secondary admin-reject-btn"
+                                                        style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+                                                        onClick={async () => {
+                                                            await deleteOffer(offer.id);
+                                                            const updated = await getOffers();
+                                                            setAllOffers(updated);
+                                                        }}
+                                                    >
+                                                        🗑️ Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* ORDERS TAB */}
                 {activeTab === 'orders' && (
                     <div className="admin-section animate-fade-in">
+                        <div className="admin-orders-filter">
+                            <h2>Active Orders ({pendingOrders.length})</h2>
+                        </div>
+
                         {orders.length === 0 ? (
-                            <div className="admin-empty-state glass-card">
-                                <span className="admin-empty-icon">📭</span>
-                                <h3>No Orders Yet</h3>
-                                <p>Orders from users will appear here when they generate thumbnails.</p>
+                            <div className="admin-empty glass-card">
+                                <span className="admin-empty-icon">📋</span>
+                                <p>No orders yet. Orders will appear here when users generate thumbnails.</p>
                             </div>
                         ) : (
                             <div className="admin-orders-list">
-                                {[...orders].reverse().map(order => (
-                                    <div key={order.id} className={`admin-order-card glass-card ${order.status === 'delivered' ? 'delivered' : ''}`}>
-                                        <div className="admin-order-header" onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}>
+                                {orders.map(order => (
+                                    <div key={order.id} className="admin-order-card glass-card">
+                                        <div
+                                            className="admin-order-header"
+                                            onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                                        >
                                             <div className="admin-order-left">
-                                                <div className="admin-order-template-icon" style={{ background: order.templatePreviewColor }}>
-                                                    <span>{order.templateIcon}</span>
+                                                <div
+                                                    className="admin-order-template-icon"
+                                                    style={{ background: order.templatePreviewColor }}
+                                                >
+                                                    {order.templateIcon}
                                                 </div>
                                                 <div>
-                                                    <div className="admin-order-title">{order.templateName}</div>
-                                                    <div className="admin-order-user">{order.userEmail}</div>
-                                                    <div className="admin-order-date">{formatDate(order.createdAt)}</div>
+                                                    <div className="admin-order-name">{order.templateName}</div>
+                                                    <div className="admin-order-user">
+                                                        {order.userEmail} · {formatDate(order.createdAt)}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="admin-order-right">
                                                 <span className={`admin-order-status status-${order.status}`}>
-                                                    {order.status === 'delivered' ? '✅ Delivered' : '⏳ Pending'}
+                                                    {order.status === 'pending' ? '⏳ Pending' :
+                                                        order.status === 'delivered' ? '✅ Delivered' : '🔄 In Progress'}
                                                 </span>
                                                 <span className="admin-order-cost">{order.totalCost} credits</span>
-                                                <svg className={`admin-order-chevron ${expandedOrder === order.id ? 'expanded' : ''}`} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <polyline points="6 9 12 15 18 9" />
+                                                <svg
+                                                    width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor" strokeWidth="2"
+                                                    style={{
+                                                        transform: expandedOrder === order.id ? 'rotate(180deg)' : 'none',
+                                                        transition: 'transform 0.2s'
+                                                    }}
+                                                >
+                                                    <polyline points="6,9 12,15 18,9" />
                                                 </svg>
                                             </div>
                                         </div>
 
                                         {expandedOrder === order.id && (
                                             <div className="admin-order-details animate-fade-in">
-                                                {/* Speed Tier */}
-                                                <div className="admin-order-detail-row">
-                                                    <span className="admin-detail-label">Delivery Speed:</span>
-                                                    <span>{order.speedTier?.label || '1 Hour'} ({order.speedTier?.icon || '⏰'})</span>
-                                                </div>
-                                                <div className="admin-order-detail-row">
-                                                    <span className="admin-detail-label">Base Cost:</span>
-                                                    <span>{order.baseCost} credits</span>
-                                                </div>
-
-                                                {/* Text Inputs */}
+                                                {/* Text requirements */}
                                                 {order.texts && Object.keys(order.texts).length > 0 && (
-                                                    <div className="admin-order-texts">
-                                                        <h4>📝 Text Content</h4>
-                                                        {Object.entries(order.texts).map(([key, value]) => (
-                                                            value && (
+                                                    <div className="admin-order-section">
+                                                        <h3>✏️ Text Content</h3>
+                                                        <div className="admin-order-texts">
+                                                            {Object.entries(order.texts).map(([key, value]) => (
                                                                 <div key={key} className="admin-order-text-item">
-                                                                    <span className="admin-detail-label">{key}:</span>
-                                                                    <span className="admin-text-value">{value}</span>
+                                                                    <span className="admin-order-text-label">{key}:</span>
+                                                                    <span className="admin-order-text-value">{value || '(empty)'}</span>
                                                                 </div>
-                                                            )
-                                                        ))}
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 )}
 
-                                                {/* Uploaded Photos */}
+                                                {/* Photo requirements */}
                                                 {order.photos && order.photos.length > 0 && (
-                                                    <div className="admin-order-photos">
-                                                        <h4>📸 Uploaded Photos</h4>
-                                                        <div className="admin-photos-grid">
-                                                            {order.photos.map((photo, i) => (
-                                                                <div key={i} className="admin-photo-item">
+                                                    <div className="admin-order-section">
+                                                        <h3>📸 Uploaded Photos</h3>
+                                                        <div className="admin-order-photos">
+                                                            {order.photos.map((photo, idx) => (
+                                                                <div key={idx} className="admin-order-photo">
                                                                     <img src={photo.dataUrl} alt={photo.label} />
-                                                                    <div className="admin-photo-overlay">
+                                                                    <div className="admin-order-photo-info">
                                                                         <span>{photo.label}</span>
                                                                         <button
-                                                                            className="admin-photo-download"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleDownloadPhoto(photo.dataUrl, photo.label);
-                                                                            }}
+                                                                            className="btn btn-secondary"
+                                                                            onClick={() => handleDownloadPhoto(photo.dataUrl, photo.label)}
+                                                                            style={{ fontSize: '0.75rem', padding: '4px 10px' }}
                                                                         >
-                                                                            ⬇️ Download
+                                                                            ⬇ Download
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -324,21 +701,18 @@ const AdminPage = () => {
                                                     </div>
                                                 )}
 
-                                                {/* Delivered Thumbnail */}
-                                                {order.status === 'delivered' && order.deliveredThumbnail && (
-                                                    <div className="admin-order-delivered">
-                                                        <h4>✅ Delivered Thumbnail</h4>
-                                                        <img src={order.deliveredThumbnail} alt="Delivered thumbnail" className="admin-delivered-img" />
-                                                        <p className="admin-delivered-date">Delivered on {formatDate(order.deliveredAt)}</p>
+                                                {/* Speed tier info */}
+                                                {order.speedTier && (
+                                                    <div className="admin-order-section">
+                                                        <h3>⚡ Speed</h3>
+                                                        <p>{order.speedTier.label} — {order.speedTier.description}</p>
                                                     </div>
                                                 )}
 
-                                                {/* Attach & Send (for pending orders) */}
+                                                {/* Delivery section */}
                                                 {order.status !== 'delivered' && (
-                                                    <div className="admin-deliver-section">
-                                                        <h4>📎 Attach & Send Thumbnail</h4>
-                                                        <p className="admin-deliver-desc">Upload the finished thumbnail from your Photoshop and send it to the user.</p>
-
+                                                    <div className="admin-order-section admin-deliver-section">
+                                                        <h3>🚀 Attach & Send Thumbnail</h3>
                                                         <div className="admin-deliver-upload">
                                                             <input
                                                                 type="file"
@@ -395,6 +769,16 @@ const AdminPage = () => {
                                                         )}
                                                     </div>
                                                 )}
+
+                                                {/* Delivered thumbnail preview */}
+                                                {order.status === 'delivered' && order.deliveredThumbnail && (
+                                                    <div className="admin-order-section">
+                                                        <h3>✅ Delivered Thumbnail</h3>
+                                                        <div className="admin-deliver-preview">
+                                                            <img src={order.deliveredThumbnail} alt="Delivered" />
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -413,153 +797,143 @@ const AdminPage = () => {
                                 <div className="admin-stat-label">Total Users</div>
                             </div>
                         </div>
-
-                        {users.length === 0 ? (
-                            <div className="admin-empty-state glass-card">
-                                <span className="admin-empty-icon">👤</span>
-                                <h3>No Users Yet</h3>
-                                <p>Users who sign in with Google will appear here.</p>
-                            </div>
-                        ) : (
-                            <div className="admin-users-table glass-card">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>User</th>
-                                            <th>Email</th>
-                                            <th>Free Credits</th>
-                                            <th>Pro Credits</th>
-                                            <th>Total</th>
-                                            <th>Last Login</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {users.map((u, i) => (
-                                            <tr key={i}>
-                                                <td>
-                                                    <div className="admin-user-cell">
-                                                        <div className="admin-user-avatar">
-                                                            {u.displayName ? u.displayName.charAt(0).toUpperCase() : '?'}
-                                                        </div>
-                                                        <span>{u.displayName || 'Unknown'}</span>
+                        <div className="admin-users-table-wrap glass-card">
+                            <table className="admin-users-table">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Email</th>
+                                        <th>Free Credits</th>
+                                        <th>Pro Credits</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {users.map(u => (
+                                        <tr key={u.uid}>
+                                            <td>
+                                                <div className="admin-user-cell">
+                                                    <div className="admin-user-avatar">
+                                                        {(u.displayName || u.email || '?')[0].toUpperCase()}
                                                     </div>
-                                                </td>
-                                                <td>{u.email}</td>
-                                                <td><span className="badge badge-free">{u.credits?.free || 0}</span></td>
-                                                <td><span className="badge badge-pro">{u.credits?.pro || 0}</span></td>
-                                                <td><strong>{(u.credits?.free || 0) + (u.credits?.pro || 0)}</strong></td>
-                                                <td>{u.lastLoginAt ? formatDate(u.lastLoginAt) : '—'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                                                    {u.displayName || 'Unknown'}
+                                                </div>
+                                            </td>
+                                            <td>{u.email}</td>
+                                            <td>{u.credits?.free || 0}</td>
+                                            <td>{u.credits?.pro || 0}</td>
+                                            <td><strong>{(u.credits?.free || 0) + (u.credits?.pro || 0)}</strong></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
 
-                {/* Templates Tab */}
+                {/* TEMPLATES TAB */}
                 {activeTab === 'templates' && (
                     <div className="admin-section animate-fade-in">
                         {templates.map((template, tIndex) => (
                             <div key={template.id} className="admin-template-card glass-card">
                                 <div className="admin-template-header">
-                                    <div className="admin-template-preview" style={{ background: template.previewColor }}>
-                                        <span>{template.icon}</span>
+                                    <div className="admin-template-icon" style={{ background: template.previewColor }}>
+                                        {template.icon}
                                     </div>
-                                    <div className="admin-template-info">
+                                    <div>
                                         <h3>{template.name}</h3>
-                                        <p>{template.description}</p>
+                                        <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-muted)' }}>{template.description}</p>
                                     </div>
                                     <div className="admin-template-cost">
                                         <label>Regular Credits</label>
-                                        <input
-                                            type="number"
-                                            value={template.baseCost}
-                                            onChange={(e) => updateTemplate(tIndex, 'baseCost', Number(e.target.value))}
-                                            min="1"
-                                            style={{ width: '80px' }}
-                                        />
-                                        <span className="admin-unit">credits</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <input
+                                                type="number"
+                                                value={template.baseCost}
+                                                onChange={(e) => updateTemplate(tIndex, 'baseCost', Number(e.target.value))}
+                                                style={{ width: '60px', textAlign: 'center' }}
+                                            />
+                                            <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)' }}>credits</span>
+                                        </div>
                                     </div>
                                     <div className="admin-template-cost">
                                         <label>Offer Credits</label>
-                                        <input
-                                            type="number"
-                                            value={template.offerCost || ''}
-                                            onChange={(e) => updateTemplate(tIndex, 'offerCost', e.target.value ? Number(e.target.value) : null)}
-                                            min="0"
-                                            placeholder="None"
-                                            style={{ width: '80px' }}
-                                        />
-                                        <span className="admin-unit">credits</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <input
+                                                type="text"
+                                                value={template.offerCost !== null && template.offerCost !== undefined ? template.offerCost : ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    updateTemplate(tIndex, 'offerCost', val === '' ? null : Number(val));
+                                                }}
+                                                placeholder="None"
+                                                style={{ width: '60px', textAlign: 'center' }}
+                                            />
+                                            <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)' }}>credits</span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Photo Requirements */}
-                                <div className="admin-requirements">
+                                {/* Photo requirements */}
+                                <div className="admin-req-section">
                                     <div className="admin-req-header">
-                                        <h4>📸 Photo Requirements ({template.requirements.photos.length})</h4>
-                                        <button className="btn btn-secondary" onClick={() => addRequirement(tIndex, 'photos')} style={{ fontSize: '0.75rem', padding: '4px 12px' }}>
+                                        <span>📸 Photo Requirements ({template.requirements.photos.length})</span>
+                                        <button className="btn btn-secondary" onClick={() => addRequirement(tIndex, 'photos')}
+                                            style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
                                             + Add Photo
                                         </button>
                                     </div>
-                                    {template.requirements.photos.map((photo, rIndex) => (
+                                    {template.requirements.photos.map((photo, pIndex) => (
                                         <div key={photo.id} className="admin-req-item">
                                             <input
                                                 type="text"
                                                 value={photo.label}
-                                                onChange={(e) => updateTemplateRequirement(tIndex, 'photos', rIndex, 'label', e.target.value)}
-                                                placeholder="Photo label"
+                                                onChange={(e) => updateTemplateRequirement(tIndex, 'photos', pIndex, 'label', e.target.value)}
                                             />
-                                            <label className="admin-checkbox">
+                                            <label className="admin-req-checkbox">
                                                 <input
                                                     type="checkbox"
                                                     checked={photo.required}
-                                                    onChange={(e) => updateTemplateRequirement(tIndex, 'photos', rIndex, 'required', e.target.checked)}
+                                                    onChange={(e) => updateTemplateRequirement(tIndex, 'photos', pIndex, 'required', e.target.checked)}
                                                 />
                                                 Required
                                             </label>
-                                            <button className="admin-remove-btn" onClick={() => removeRequirement(tIndex, 'photos', rIndex)} title="Remove">
-                                                ✕
-                                            </button>
+                                            <button className="admin-req-remove" onClick={() => removeRequirement(tIndex, 'photos', pIndex)}>×</button>
                                         </div>
                                     ))}
                                 </div>
 
-                                {/* Text Requirements */}
-                                <div className="admin-requirements">
+                                {/* Text requirements */}
+                                <div className="admin-req-section">
                                     <div className="admin-req-header">
-                                        <h4>✏️ Text Requirements ({template.requirements.texts.length})</h4>
-                                        <button className="btn btn-secondary" onClick={() => addRequirement(tIndex, 'texts')} style={{ fontSize: '0.75rem', padding: '4px 12px' }}>
+                                        <span>✏️ Text Requirements ({template.requirements.texts.length})</span>
+                                        <button className="btn btn-secondary" onClick={() => addRequirement(tIndex, 'texts')}
+                                            style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
                                             + Add Text
                                         </button>
                                     </div>
-                                    {template.requirements.texts.map((text, rIndex) => (
+                                    {template.requirements.texts.map((text, txIndex) => (
                                         <div key={text.id} className="admin-req-item">
                                             <input
                                                 type="text"
                                                 value={text.label}
-                                                onChange={(e) => updateTemplateRequirement(tIndex, 'texts', rIndex, 'label', e.target.value)}
-                                                placeholder="Field label"
+                                                onChange={(e) => updateTemplateRequirement(tIndex, 'texts', txIndex, 'label', e.target.value)}
                                             />
                                             <input
                                                 type="text"
                                                 value={text.placeholder}
-                                                onChange={(e) => updateTemplateRequirement(tIndex, 'texts', rIndex, 'placeholder', e.target.value)}
-                                                placeholder="Placeholder text"
+                                                onChange={(e) => updateTemplateRequirement(tIndex, 'texts', txIndex, 'placeholder', e.target.value)}
+                                                placeholder="Placeholder..."
                                             />
-                                            <label className="admin-checkbox">
+                                            <label className="admin-req-checkbox">
                                                 <input
                                                     type="checkbox"
                                                     checked={text.required}
-                                                    onChange={(e) => updateTemplateRequirement(tIndex, 'texts', rIndex, 'required', e.target.checked)}
+                                                    onChange={(e) => updateTemplateRequirement(tIndex, 'texts', txIndex, 'required', e.target.checked)}
                                                 />
                                                 Required
                                             </label>
-                                            <button className="admin-remove-btn" onClick={() => removeRequirement(tIndex, 'texts', rIndex)} title="Remove">
-                                                ✕
-                                            </button>
+                                            <button className="admin-req-remove" onClick={() => removeRequirement(tIndex, 'texts', txIndex)}>×</button>
                                         </div>
                                     ))}
                                 </div>
@@ -568,79 +942,71 @@ const AdminPage = () => {
                     </div>
                 )}
 
-                {/* Credit Packages Tab */}
-                {activeTab === 'credits' && (
+                {/* CREDIT PACKAGES TAB */}
+                {activeTab === 'packages' && (
                     <div className="admin-section animate-fade-in">
                         <div className="admin-packages-grid">
                             {creditPackages.map((pkg, index) => (
                                 <div key={pkg.id} className="admin-package-card glass-card">
-                                    <h3>{pkg.label}</h3>
-                                    <div className="admin-field">
-                                        <label>Credits</label>
-                                        <input
-                                            type="number"
-                                            value={pkg.credits}
-                                            onChange={(e) => updatePackage(index, 'credits', e.target.value)}
-                                            min="1"
-                                        />
+                                    <div className="admin-package-header" style={{ background: pkg.color }}>
+                                        <span className="admin-package-label">{pkg.label}</span>
                                     </div>
-                                    <div className="admin-field">
-                                        <label>Regular Price (₹)</label>
-                                        <input
-                                            type="number"
-                                            value={pkg.price}
-                                            onChange={(e) => updatePackage(index, 'price', e.target.value)}
-                                            min="1"
-                                        />
+                                    <div className="admin-package-fields">
+                                        <div className="admin-field">
+                                            <label>Credits</label>
+                                            <input
+                                                type="number"
+                                                value={pkg.credits}
+                                                onChange={(e) => updatePackage(index, 'credits', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="admin-field">
+                                            <label>Regular Price ({pkg.currency})</label>
+                                            <input
+                                                type="number"
+                                                value={pkg.price}
+                                                onChange={(e) => updatePackage(index, 'price', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="admin-field">
+                                            <label>Sale Price ({pkg.currency})</label>
+                                            <input
+                                                type="text"
+                                                value={pkg.salePrice !== null && pkg.salePrice !== undefined ? pkg.salePrice : ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    updatePackage(index, 'salePrice', val === '' ? null : Number(val));
+                                                }}
+                                                placeholder="None"
+                                            />
+                                        </div>
+                                        <label className="admin-req-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                checked={pkg.popular}
+                                                onChange={(e) => updatePackage(index, 'popular', e.target.checked)}
+                                            />
+                                            Mark as Popular
+                                        </label>
                                     </div>
-                                    <div className="admin-field">
-                                        <label>Sale Price (₹)</label>
-                                        <input
-                                            type="number"
-                                            value={pkg.salePrice || ''}
-                                            onChange={(e) => updatePackage(index, 'salePrice', e.target.value ? Number(e.target.value) : null)}
-                                            min="0"
-                                            placeholder="No sale"
-                                        />
-                                    </div>
-                                    <label className="admin-checkbox">
-                                        <input
-                                            type="checkbox"
-                                            checked={pkg.popular}
-                                            onChange={(e) => updatePackage(index, 'popular', e.target.checked)}
-                                        />
-                                        Mark as Popular
-                                    </label>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
 
-                {/* Speed Tiers Tab */}
+                {/* SPEED TIERS TAB */}
                 {activeTab === 'speed' && (
                     <div className="admin-section animate-fade-in">
                         <div className="admin-speed-grid">
                             {speedTiers.map((tier, index) => (
                                 <div key={tier.id} className="admin-speed-card glass-card">
-                                    <div className="admin-speed-icon">{tier.icon}</div>
-                                    <h3>{tier.label}</h3>
                                     <div className="admin-field">
-                                        <label>Duration (minutes)</label>
+                                        <label>Label</label>
                                         <input
-                                            type="number"
-                                            value={tier.minutes}
-                                            onChange={(e) => updateSpeedTier(index, 'minutes', e.target.value)}
-                                            min="5"
-                                        />
-                                    </div>
-                                    <div className="admin-field">
-                                        <label>Extra Credits Charge</label>
-                                        <input
-                                            type="number"
-                                            value={tier.extraCredits}
-                                            onChange={(e) => updateSpeedTier(index, 'extraCredits', e.target.value)}
-                                            min="0"
+                                            type="text"
+                                            value={tier.label}
+                                            onChange={(e) => updateSpeedTier(index, 'label', e.target.value)}
                                         />
                                     </div>
                                     <div className="admin-field">
@@ -649,6 +1015,22 @@ const AdminPage = () => {
                                             type="text"
                                             value={tier.description}
                                             onChange={(e) => updateSpeedTier(index, 'description', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="admin-field">
+                                        <label>Minutes</label>
+                                        <input
+                                            type="number"
+                                            value={tier.minutes}
+                                            onChange={(e) => updateSpeedTier(index, 'minutes', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="admin-field">
+                                        <label>Extra Credits</label>
+                                        <input
+                                            type="number"
+                                            value={tier.extraCredits}
+                                            onChange={(e) => updateSpeedTier(index, 'extraCredits', e.target.value)}
                                         />
                                     </div>
                                 </div>

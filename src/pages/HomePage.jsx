@@ -9,15 +9,30 @@ import './HomePage.css';
 const HomePage = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
-    const [credits, setCredits] = useState(getUserCredits());
+    const [credits, setCredits] = useState({ free: 0, pro: 0 });
     const [activeTimer, setActiveTimer] = useState(null);
     const [deliveredOrders, setDeliveredOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        setCredits(getUserCredits());
-        setActiveTimer(getActiveTimer());
-        setDeliveredOrders(getUnseenDeliveredOrders());
-    }, []);
+        const loadData = async () => {
+            if (!user) return;
+            setLoading(true);
+            try {
+                const [creds, unseen] = await Promise.all([
+                    getUserCredits(user.uid),
+                    getUnseenDeliveredOrders(user.uid)
+                ]);
+                setCredits(creds);
+                setDeliveredOrders(unseen);
+                setActiveTimer(getActiveTimer());
+            } catch (error) {
+                console.error('Error loading home data:', error);
+            }
+            setLoading(false);
+        };
+        loadData();
+    }, [user]);
 
     return (
         <div className="home-page page">
@@ -51,7 +66,7 @@ const HomePage = () => {
                             <span className="badge badge-free">FREE</span>
                             <span className="credit-card-label">Monthly Credits</span>
                         </div>
-                        <div className="credit-card-value">{credits.free}</div>
+                        <div className="credit-card-value">{loading ? '...' : credits.free}</div>
                         <div className="credit-card-footer">Refreshes every month</div>
                     </div>
 
@@ -60,7 +75,7 @@ const HomePage = () => {
                             <span className="badge badge-pro">PRO</span>
                             <span className="credit-card-label">Purchased Credits</span>
                         </div>
-                        <div className="credit-card-value">{credits.pro}</div>
+                        <div className="credit-card-value">{loading ? '...' : credits.pro}</div>
                         <div className="credit-card-footer">
                             <button className="btn btn-secondary" onClick={() => navigate('/credits')} style={{ fontSize: '0.8rem', padding: '6px 16px' }}>
                                 Buy More

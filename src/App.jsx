@@ -10,6 +10,8 @@ import PaymentPage from './pages/PaymentPage';
 import GenerationPage from './pages/GenerationPage';
 import CreditStorePage from './pages/CreditStorePage';
 import AdminPage from './pages/AdminPage';
+import QRPaymentPage from './pages/QRPaymentPage';
+import PaymentNotification from './components/PaymentNotification';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -60,6 +62,9 @@ const AppRoutes = () => {
       <Route path="/admin" element={
         <ProtectedRoute><Navbar /><AdminPage /></ProtectedRoute>
       } />
+      <Route path="/pay" element={
+        <ProtectedRoute><Navbar /><QRPaymentPage /></ProtectedRoute>
+      } />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -70,6 +75,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <PaymentNotification />
       </AuthProvider>
     </BrowserRouter>
   );

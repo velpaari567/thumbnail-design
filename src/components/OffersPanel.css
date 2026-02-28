@@ -1,0 +1,276 @@
+/* Offers Panel */
+.offers-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 380px;
+    max-height: 480px;
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+}
+
+.offers-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    background: var(--bg-secondary);
+    z-index: 1;
+}
+
+.offers-panel-header h3 {
+    font-size: var(--font-md);
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.offers-close-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.offers-close-btn:hover {
+    color: var(--text-primary);
+}
+
+/* Loading */
+.offers-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    padding: var(--space-2xl);
+    color: var(--text-muted);
+    font-size: var(--font-sm);
+}
+
+/* Empty */
+.offers-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-2xl) var(--space-lg);
+    text-align: center;
+}
+
+.offers-empty-icon {
+    font-size: 2.5rem;
+    margin-bottom: var(--space-sm);
+    opacity: 0.5;
+}
+
+.offers-empty p {
+    color: var(--text-secondary);
+    font-size: var(--font-sm);
+    margin: 0 0 4px;
+}
+
+.offers-empty-sub {
+    color: var(--text-muted);
+    font-size: var(--font-xs);
+}
+
+/* List */
+.offers-list {
+    padding: var(--space-sm);
+}
+
+/* Section */
+.offers-section {
+    margin-bottom: var(--space-sm);
+}
+
+.offers-section:last-child {
+    margin-bottom: 0;
+}
+
+.offers-section-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: var(--space-xs) var(--space-sm);
+    color: var(--text-muted);
+}
+
+.offers-section-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.offers-section-dot.active {
+    background: #10b981;
+    box-shadow: 0 0 6px #10b981;
+    animation: pulse-dot 2s infinite;
+}
+
+.offers-section-dot.upcoming {
+    background: #f59e0b;
+}
+
+@keyframes pulse-dot {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+}
+
+/* Offer Card */
+.offer-card {
+    display: flex;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-xs);
+    transition: all 0.2s;
+}
+
+.offer-card:last-child {
+    margin-bottom: 0;
+}
+
+.offer-card-active {
+    background: rgba(16, 185, 129, 0.06);
+    border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+.offer-card-active:hover {
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.offer-card-upcoming {
+    background: rgba(245, 158, 11, 0.06);
+    border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.offer-card-upcoming:hover {
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.offer-card-emoji {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.offer-card-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.offer-card-title {
+    font-size: var(--font-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.offer-card-desc {
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin-bottom: 6px;
+}
+
+.offer-card-timer {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #10b981;
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.offer-card-starts {
+    color: #f59e0b !important;
+    background: rgba(245, 158, 11, 0.1) !important;
+}
+
+/* Navbar gift icon styles */
+.navbar-offers-wrapper {
+    position: relative;
+}
+
+.navbar-offers-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.navbar-offers-btn:hover {
+    background: var(--bg-tertiary);
+}
+
+.navbar-offers-btn .gift-icon {
+    font-size: 1.3rem;
+}
+
+.navbar-offers-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    background: #ef4444;
+    border-radius: 50%;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-primary);
+    animation: pulse-badge 2s infinite;
+}
+
+@keyframes pulse-badge {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .offers-panel {
+        position: fixed;
+        top: 60px;
+        right: var(--space-sm);
+        left: var(--space-sm);
+        width: auto;
+        max-height: calc(100vh - 80px);
+    }
+}

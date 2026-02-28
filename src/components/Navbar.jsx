@@ -1,16 +1,39 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUserCredits } from '../utils/credits';
+import { getOffers, categorizeOffers } from '../utils/offers';
+import { useState, useEffect } from 'react';
+import OffersPanel from './OffersPanel';
 import './Navbar.css';
 
 const Navbar = () => {
-    const { user, signOut, isAdmin } = useAuth();
+    const { user, logout, isAdmin } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const credits = getUserCredits();
+    const [credits, setCredits] = useState({ free: 0, pro: 0 });
+    const [offersOpen, setOffersOpen] = useState(false);
+    const [activeOfferCount, setActiveOfferCount] = useState(0);
+
+    useEffect(() => {
+        const loadData = async () => {
+            if (user) {
+                const [creds, allOffers] = await Promise.all([
+                    getUserCredits(user.uid),
+                    getOffers()
+                ]);
+                setCredits(creds);
+                const { active, upcoming } = categorizeOffers(allOffers);
+                setActiveOfferCount(active.length + upcoming.length);
+            }
+        };
+        loadData();
+
+        const interval = setInterval(loadData, 5000);
+        return () => clearInterval(interval);
+    }, [user]);
 
     const handleSignOut = () => {
-        signOut();
+        logout();
         navigate('/');
     };
 
@@ -43,6 +66,21 @@ const Navbar = () => {
                 </div>
 
                 <div className="navbar-right">
+                    {/* Gift / Offers Icon */}
+                    <div className="navbar-offers-wrapper">
+                        <button
+                            className="navbar-offers-btn"
+                            onClick={() => setOffersOpen(!offersOpen)}
+                            title="Offers & Deals"
+                        >
+                            <span className="gift-icon">🎁</span>
+                            {activeOfferCount > 0 && (
+                                <span className="navbar-offers-badge">{activeOfferCount}</span>
+                            )}
+                        </button>
+                        <OffersPanel isOpen={offersOpen} onClose={() => setOffersOpen(false)} />
+                    </div>
+
                     <div className="navbar-credits">
                         <div className="navbar-credit-item">
                             <span className="badge badge-free">FREE</span>
@@ -59,7 +97,7 @@ const Navbar = () => {
                             {user.photoURL ? (
                                 <img src={user.photoURL} alt={user.displayName} />
                             ) : (
-                                <span>{user.email[0].toUpperCase()}</span>
+                                <span>{(user.email || '?')[0].toUpperCase()}</span>
                             )}
                         </div>
                         <div className="navbar-user-info">

@@ -1,39 +1,40 @@
-// Template data with default configurations
-// Admin can override these settings from the admin panel
+// Template data with Firestore persistence
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const defaultTemplates = [
   {
     id: 'template-1',
     name: 'Gaming Highlight',
     description: 'Perfect for gaming videos with action shots',
-    previewColor: 'linear-gradient(135deg, #ff6b6b, #ee5a24)',
+    previewColor: 'linear-gradient(135deg, #ff6b35, #f7c948)',
     icon: '🎮',
     requirements: {
       photos: [
-        { id: 'main-photo', label: 'Main Character/Player Photo', required: true }
+        { id: 'photo-1', label: 'Main Character/Player Photo', required: false }
       ],
       texts: [
-        { id: 'title', label: 'Video Title', placeholder: 'Enter your video title...', required: true },
-        { id: 'subtitle', label: 'Subtitle/Tagline', placeholder: 'Enter a catchy tagline...', required: false }
+        { id: 'text-1', label: 'Video Title', placeholder: 'Enter your video title...', required: false },
+        { id: 'text-2', label: 'Subtitle/Tagline', placeholder: 'Enter a catchy tagline...', required: false }
       ]
     },
     baseCost: 10,
-    offerCost: null // When set, shows as discounted price
+    offerCost: null
   },
   {
     id: 'template-2',
     name: 'Tech Review',
     description: 'Clean layout for tech product reviews',
-    previewColor: 'linear-gradient(135deg, #4facfe, #00f2fe)',
-    icon: '📱',
+    previewColor: 'linear-gradient(135deg, #00d2ff, #3a7bd5)',
+    icon: '💻',
     requirements: {
       photos: [
-        { id: 'product-photo', label: 'Product Photo', required: true },
-        { id: 'person-photo', label: 'Your Photo', required: true }
+        { id: 'photo-1', label: 'Product Photo', required: false },
+        { id: 'photo-2', label: 'Background Image', required: false }
       ],
       texts: [
-        { id: 'product-name', label: 'Product Name', placeholder: 'e.g., iPhone 16 Pro', required: true },
-        { id: 'verdict', label: 'Review Verdict', placeholder: 'e.g., Best Phone of 2026?', required: false }
+        { id: 'text-1', label: 'Product Name', placeholder: 'Enter product name...', required: false },
+        { id: 'text-2', label: 'Review Verdict', placeholder: 'e.g. Must Buy, Worth It...', required: false }
       ]
     },
     baseCost: 12,
@@ -47,10 +48,10 @@ const defaultTemplates = [
     icon: '🎬',
     requirements: {
       photos: [
-        { id: 'selfie', label: 'Your Best Photo', required: true }
+        { id: 'photo-1', label: 'Your Photo', required: false }
       ],
       texts: [
-        { id: 'title', label: 'Vlog Title', placeholder: 'What\'s your vlog about?', required: true }
+        { id: 'text-1', label: 'Vlog Title', placeholder: 'What\'s the vlog about?', required: false }
       ]
     },
     baseCost: 8,
@@ -58,39 +59,37 @@ const defaultTemplates = [
   },
   {
     id: 'template-4',
-    name: 'Tutorial/How-To',
-    description: 'Educational content with step indicators',
-    previewColor: 'linear-gradient(135deg, #43e97b, #38f9d7)',
-    icon: '📚',
+    name: 'Tutorial',
+    description: 'Educational and clean tutorial style',
+    previewColor: 'linear-gradient(135deg, #11998e, #38ef7d)',
+    icon: '🎨',
     requirements: {
       photos: [
-        { id: 'demo-photo', label: 'Demo/Result Photo', required: true },
-        { id: 'before-photo', label: 'Before Photo (Optional)', required: false }
+        { id: 'photo-1', label: 'Preview/Screenshot', required: false }
       ],
       texts: [
-        { id: 'title', label: 'Tutorial Title', placeholder: 'e.g., How to Edit Like a Pro', required: true },
-        { id: 'steps', label: 'Number of Steps', placeholder: 'e.g., 5 Easy Steps', required: false },
-        { id: 'tool', label: 'Tool/Software Used', placeholder: 'e.g., Photoshop, Premiere Pro', required: false }
+        { id: 'text-1', label: 'Tutorial Title', placeholder: 'What are you teaching?', required: false },
+        { id: 'text-2', label: 'Step Count', placeholder: 'e.g. 5 Easy Steps', required: false }
       ]
     },
     baseCost: 10,
-    offerCost: null // When set, shows as discounted price
+    offerCost: null
   },
   {
     id: 'template-5',
-    name: 'Podcast/Talk',
-    description: 'Professional layout for podcast episodes',
-    previewColor: 'linear-gradient(135deg, #fa709a, #fee140)',
+    name: 'Podcast',
+    description: 'Professional podcast episode thumbnail',
+    previewColor: 'linear-gradient(135deg, #f7971e, #ffd200)',
     icon: '🎙️',
     requirements: {
       photos: [
-        { id: 'host-photo', label: 'Host Photo', required: true },
-        { id: 'guest-photo', label: 'Guest Photo', required: true },
-        { id: 'logo', label: 'Show Logo (Optional)', required: false }
+        { id: 'photo-1', label: 'Host Photo', required: false },
+        { id: 'photo-2', label: 'Guest Photo', required: false }
       ],
       texts: [
-        { id: 'episode-title', label: 'Episode Title', placeholder: 'e.g., The Future of AI', required: true },
-        { id: 'guest-name', label: 'Guest Name', placeholder: 'e.g., Elon Musk', required: true }
+        { id: 'text-1', label: 'Episode Title', placeholder: 'Episode topic...', required: false },
+        { id: 'text-2', label: 'Guest Name', placeholder: 'Who is the guest?', required: false },
+        { id: 'text-3', label: 'Episode Number', placeholder: 'EP #', required: false }
       ]
     },
     baseCost: 15,
@@ -98,43 +97,54 @@ const defaultTemplates = [
   },
   {
     id: 'template-6',
-    name: 'Reaction/Commentary',
+    name: 'Reaction',
     description: 'Eye-catching reaction video thumbnail',
-    previewColor: 'linear-gradient(135deg, #a18cd1, #fbc2eb)',
-    icon: '😱',
+    previewColor: 'linear-gradient(135deg, #a855f7, #ec4899)',
+    icon: '🤩',
     requirements: {
       photos: [
-        { id: 'reaction-face', label: 'Your Reaction Face', required: true },
-        { id: 'content-screenshot', label: 'Content Screenshot', required: true }
+        { id: 'photo-1', label: 'Your Reaction Photo', required: false },
+        { id: 'photo-2', label: 'What you\'re reacting to', required: false }
       ],
       texts: [
-        { id: 'title', label: 'Reaction Title', placeholder: 'e.g., I Can\'t Believe This!', required: true }
+        { id: 'text-1', label: 'Reaction Title', placeholder: 'e.g. I Can\'t Believe This!', required: false }
       ]
     },
     baseCost: 10,
-    offerCost: null // When set, shows as discounted price
+    offerCost: null
   }
 ];
 
-export const getTemplates = () => {
-  const adminConfig = localStorage.getItem('admin_templates');
-  if (adminConfig) {
-    try {
-      return JSON.parse(adminConfig);
-    } catch {
-      return defaultTemplates;
+const CONFIG_DOC_ID = 'templates';
+
+export const getTemplates = async () => {
+  try {
+    const docRef = doc(db, 'config', CONFIG_DOC_ID);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists() && docSnap.data().items) {
+      return docSnap.data().items;
     }
+
+    // First run — save defaults to Firestore
+    await setDoc(docRef, { items: defaultTemplates });
+    return defaultTemplates;
+  } catch (error) {
+    console.error('Error getting templates:', error);
+    return defaultTemplates;
   }
-  return defaultTemplates;
 };
 
-export const saveTemplates = (templates) => {
-  localStorage.setItem('admin_templates', JSON.stringify(templates));
+export const saveTemplates = async (templates) => {
+  try {
+    const docRef = doc(db, 'config', CONFIG_DOC_ID);
+    await setDoc(docRef, { items: templates });
+  } catch (error) {
+    console.error('Error saving templates:', error);
+  }
 };
 
-export const getTemplateById = (id) => {
-  const templates = getTemplates();
-  return templates.find(t => t.id === id);
+export const getTemplateById = async (templateId) => {
+  const templates = await getTemplates();
+  return templates.find(t => t.id === templateId) || null;
 };
-
-export default defaultTemplates;

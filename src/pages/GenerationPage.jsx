@@ -17,48 +17,52 @@ const GenerationPage = () => {
     const pollRef = useRef(null);
 
     useEffect(() => {
-        // Try to get timer by orderId, or find any active timer
-        let state = orderId ? getTimerState(orderId) : getActiveTimer();
+        const init = async () => {
+            // Try to get timer by orderId, or find any active timer
+            let state = orderId ? getTimerState(orderId) : getActiveTimer();
 
-        if (!state) {
-            // Check if there's a delivered order to show (only if visible)
-            if (orderId) {
-                const order = getOrderById(orderId);
+            if (!state) {
+                // Check if there's a delivered order to show (only if visible)
+                if (orderId) {
+                    const order = await getOrderById(orderId);
+                    if (order && order.deliveredThumbnail && isOrderVisible(order)) {
+                        setDeliveredThumbnail(order.deliveredThumbnail);
+                        setShowDelivered(true);
+                        await markOrderSeen(orderId);
+                        return;
+                    }
+                }
+                setTimerState(null);
+                return;
+            }
+
+            setTimerState(state);
+
+            // Update timer every second
+            intervalRef.current = setInterval(() => {
+                const currentState = getTimerState(state.orderId);
+                if (currentState) {
+                    setTimerState(currentState);
+                    setDisplayTime(formatTime(currentState.remaining));
+                    setProgress(currentState.progress * 100);
+                }
+            }, 1000);
+
+            // Poll for delivery every 3 seconds (checks if admin has delivered AND it's visible)
+            pollRef.current = setInterval(async () => {
+                const order = await getOrderById(state.orderId);
                 if (order && order.deliveredThumbnail && isOrderVisible(order)) {
                     setDeliveredThumbnail(order.deliveredThumbnail);
                     setShowDelivered(true);
-                    markOrderSeen(orderId);
-                    return;
+                    await markOrderSeen(order.id);
+                    // Clear timers
+                    if (intervalRef.current) clearInterval(intervalRef.current);
+                    if (pollRef.current) clearInterval(pollRef.current);
                 }
-            }
-            setTimerState(null);
-            return;
-        }
+            }, 3000);
+        };
 
-        setTimerState(state);
-
-        // Update timer every second
-        intervalRef.current = setInterval(() => {
-            const currentState = getTimerState(state.orderId);
-            if (currentState) {
-                setTimerState(currentState);
-                setDisplayTime(formatTime(currentState.remaining));
-                setProgress(currentState.progress * 100);
-            }
-        }, 1000);
-
-        // Poll for delivery every 2 seconds (checks if admin has delivered AND it's visible)
-        pollRef.current = setInterval(() => {
-            const order = getOrderById(state.orderId);
-            if (order && order.deliveredThumbnail && isOrderVisible(order)) {
-                setDeliveredThumbnail(order.deliveredThumbnail);
-                setShowDelivered(true);
-                markOrderSeen(order.id);
-                // Clear timers
-                if (intervalRef.current) clearInterval(intervalRef.current);
-                if (pollRef.current) clearInterval(pollRef.current);
-            }
-        }, 2000);
+        init();
 
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
