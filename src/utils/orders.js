@@ -1,6 +1,7 @@
 // Order management via Firestore
 import { collection, doc, addDoc, getDoc, getDocs, updateDoc, query, where, orderBy, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { createNotification } from './notifications';
 
 export const ORDER_STATUS = {
     PENDING: 'pending',
@@ -96,6 +97,9 @@ export const getDeliveredOrders = async () => {
 export const deliverOrder = async (orderId, thumbnailBase64, delayMinutes = 0) => {
     try {
         const orderRef = doc(db, 'orders', orderId);
+        const orderSnap = await getDoc(orderRef);
+        const orderData = orderSnap.exists() ? orderSnap.data() : null;
+
         const now = Date.now();
         const visibleAt = delayMinutes > 0 ? now + (delayMinutes * 60 * 1000) : now;
 
@@ -106,6 +110,16 @@ export const deliverOrder = async (orderId, thumbnailBase64, delayMinutes = 0) =
             visibleAt: visibleAt,
             seen: false
         });
+
+        if (orderData) {
+            await createNotification(orderData.userUid, {
+                title: 'Thumbnail Delivered!',
+                message: `Your thumbnail for "${orderData.templateName}" is ready.`,
+                type: 'success',
+                metadata: { templateName: orderData.templateName, creditsUsed: orderData.totalCost }
+            });
+        }
+
         return true;
     } catch (error) {
         console.error('Error delivering order:', error);

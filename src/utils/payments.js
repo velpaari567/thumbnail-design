@@ -1,7 +1,7 @@
-// Payment request management via Firestore
-import { collection, doc, addDoc, getDocs, updateDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, doc, addDoc, getDoc, getDocs, updateDoc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { addCredits } from './credits';
+import { createNotification } from './notifications';
 
 export const PAYMENT_STATUS = {
     PENDING: 'pending',
@@ -70,6 +70,14 @@ export const approvePaymentRequest = async (requestId, userUid, credits) => {
 
         // Add credits to the user's account
         await addCredits(userUid, credits, 'pro');
+
+        await createNotification(userUid, {
+            title: 'Payment Successful',
+            message: `Your payment was approved. ${credits} credits have been added to your account!`,
+            type: 'success',
+            metadata: { creditsAdded: credits }
+        });
+
         return true;
     } catch (error) {
         console.error('Error approving payment:', error);
@@ -80,6 +88,18 @@ export const approvePaymentRequest = async (requestId, userUid, credits) => {
 export const rejectPaymentRequest = async (requestId) => {
     try {
         const reqRef = doc(db, 'paymentRequests', requestId);
+
+        // Need to get the user UID first
+        const reqSnap = await getDoc(reqRef);
+        if (reqSnap.exists()) {
+            const data = reqSnap.data();
+            await createNotification(data.userUid, {
+                title: 'Payment Failed',
+                message: 'Your payment was not successful. Kindly send the payment to the valid owner.',
+                type: 'error'
+            });
+        }
+
         await updateDoc(reqRef, {
             status: PAYMENT_STATUS.REJECTED,
             processedAt: Date.now()

@@ -4,6 +4,7 @@ import { getUserCredits } from '../utils/credits';
 import { getOffers, categorizeOffers } from '../utils/offers';
 import { useState, useEffect } from 'react';
 import OffersPanel from './OffersPanel';
+import NotificationsPanel from './NotificationsPanel';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -13,6 +14,8 @@ const Navbar = () => {
     const [credits, setCredits] = useState({ free: 0, pro: 0 });
     const [offersOpen, setOffersOpen] = useState(false);
     const [activeOfferCount, setActiveOfferCount] = useState(0);
+    const [notifOpen, setNotifOpen] = useState(false);
+    const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
     useEffect(() => {
         const loadData = async () => {
@@ -70,7 +73,10 @@ const Navbar = () => {
                     <div className="navbar-offers-wrapper">
                         <button
                             className="navbar-offers-btn"
-                            onClick={() => setOffersOpen(!offersOpen)}
+                            onClick={() => {
+                                setOffersOpen(!offersOpen);
+                                setNotifOpen(false);
+                            }}
                             title="Offers & Deals"
                         >
                             <span className="gift-icon">🎁</span>
@@ -79,6 +85,28 @@ const Navbar = () => {
                             )}
                         </button>
                         <OffersPanel isOpen={offersOpen} onClose={() => setOffersOpen(false)} />
+                    </div>
+
+                    {/* Notifications Icon */}
+                    <div className="navbar-offers-wrapper">
+                        <button
+                            className="navbar-offers-btn navbar-notif-btn"
+                            onClick={() => {
+                                setNotifOpen(!notifOpen);
+                                setOffersOpen(false);
+                            }}
+                            title="Notifications"
+                        >
+                            <span className="gift-icon" style={{ filter: 'grayscale(1)', fontSize: '1.2rem' }}>🔔</span>
+                            {unreadNotifCount > 0 && (
+                                <span className="navbar-offers-badge">{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
+                            )}
+                        </button>
+                        <NotificationsPanel
+                            isOpen={notifOpen}
+                            onClose={() => setNotifOpen(false)}
+                            onUnreadCount={setUnreadNotifCount}
+                        />
                     </div>
 
                     <div className="navbar-credits">

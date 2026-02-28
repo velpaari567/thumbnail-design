@@ -164,6 +164,21 @@ const AdminPage = () => {
         setCreditPackages(updated);
     };
 
+    const handleTemplateImageUpload = (tIndex, e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 1048576) {
+                alert('Image is too large. Please use an image under 1MB.');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                updateTemplate(tIndex, 'thumbnailUrl', ev.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     // Speed tier editing
     const updateSpeedTier = (index, field, value) => {
         const updated = [...speedTiers];
@@ -837,22 +852,51 @@ const AdminPage = () => {
                         {templates.map((template, tIndex) => (
                             <div key={template.id} className="admin-template-card glass-card">
                                 <div className="admin-template-header">
-                                    <div className="admin-template-icon" style={{ background: template.previewColor }}>
-                                        <input
-                                            type="text"
-                                            value={template.icon}
-                                            onChange={(e) => updateTemplate(tIndex, 'icon', e.target.value)}
-                                            style={{
-                                                background: 'transparent',
-                                                border: 'none',
-                                                color: 'white',
-                                                fontSize: '1.5rem',
-                                                width: '40px',
-                                                textAlign: 'center',
-                                                padding: 0
-                                            }}
-                                            title="Edit Emoji/Icon"
-                                        />
+                                    <div className="admin-template-icon" style={{
+                                        background: template.previewColor,
+                                        backgroundImage: template.thumbnailUrl ? `url(${template.thumbnailUrl})` : 'none',
+                                        backgroundSize: 'cover',
+                                        backgroundPosition: 'center',
+                                        position: 'relative',
+                                        overflow: 'hidden'
+                                    }}>
+                                        {!template.thumbnailUrl && (
+                                            <input
+                                                type="text"
+                                                value={template.icon}
+                                                onChange={(e) => updateTemplate(tIndex, 'icon', e.target.value)}
+                                                style={{
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    color: 'white',
+                                                    fontSize: '1.5rem',
+                                                    width: '40px',
+                                                    textAlign: 'center',
+                                                    padding: 0
+                                                }}
+                                                title="Edit Emoji/Icon"
+                                            />
+                                        )}
+                                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.5)', padding: '2px', textAlign: 'center' }}>
+                                            <label style={{ fontSize: '0.6rem', color: 'white', cursor: 'pointer', display: 'block' }}>
+                                                Upload
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    style={{ display: 'none' }}
+                                                    onChange={(e) => handleTemplateImageUpload(tIndex, e)}
+                                                />
+                                            </label>
+                                            {template.thumbnailUrl && (
+                                                <button
+                                                    onClick={() => updateTemplate(tIndex, 'thumbnailUrl', null)}
+                                                    style={{ background: 'none', border: 'none', color: '#ff4444', fontSize: '0.6rem', cursor: 'pointer', padding: '0 2px' }}
+                                                    title="Remove Image"
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                     <div style={{ flex: 1 }}>
                                         <input

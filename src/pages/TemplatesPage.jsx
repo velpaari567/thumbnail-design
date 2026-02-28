@@ -90,8 +90,13 @@ const TemplatesPage = () => {
                                 onClick={() => setSelectedId(template.id)}
                                 id={`template-${template.id}`}
                             >
-                                <div className="template-preview" style={{ background: template.previewColor }}>
-                                    <span className="template-icon">{template.icon}</span>
+                                <div className="template-preview" style={{
+                                    background: template.previewColor,
+                                    backgroundImage: template.thumbnailUrl ? `url(${template.thumbnailUrl})` : 'none',
+                                    backgroundSize: 'cover',
+                                    backgroundPosition: 'center'
+                                }}>
+                                    {!template.thumbnailUrl && <span className="template-icon">{template.icon}</span>}
                                     <div className={`template-credit-badge ${pricing.hasOffer ? 'has-offer' : ''}`}>
                                         {pricing.hasOffer ? (
                                             <>
