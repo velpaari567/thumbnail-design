@@ -20,8 +20,9 @@ const QRPaymentPage = () => {
     const [submitted, setSubmitted] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    // Generate UPI deep link with amount pre-filled
-    const upiLink = `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(UPI_NAME)}&am=${amount}&cu=INR&tn=${encodeURIComponent(`ThumbCraftAI - ${credits} Credits`)}`;
+    // Generate UPI deep link with amount and email pre-filled in the transaction note
+    const paymentNote = user ? `ThumbCraftAI - ${user.email}` : `ThumbCraftAI - ${credits} Credits`;
+    const upiLink = `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(UPI_NAME)}&am=${amount}&cu=INR&tn=${encodeURIComponent(paymentNote)}`;
 
     // Generate QR code using free API (amount pre-filled)
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(upiLink)}`;
@@ -139,6 +140,14 @@ const QRPaymentPage = () => {
                             <div className="qr-amount-display">
                                 <span className="qr-amount-label">Pay exactly</span>
                                 <span className="qr-amount-value">{currency}{amount}</span>
+                            </div>
+                        </div>
+
+                        <div className="qr-email-instruction">
+                            <div className="qr-email-instruction-icon">⚠️</div>
+                            <div className="qr-email-instruction-text">
+                                <strong>Important for Verification:</strong>
+                                <p>If paying manually via GPay/PhonePe, you MUST include your email <code>{user?.email}</code> in the payment description/add note field. This is how we verify your payment!</p>
                             </div>
                         </div>
 

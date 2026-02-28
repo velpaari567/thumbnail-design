@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTemplates } from '../data/templateData';
 import { getPendingOrdersByUser } from '../utils/orders';
+import { getSystemSettings } from '../utils/system';
+import { getUserCredits } from '../utils/credits';
 import { useAuth } from '../context/AuthContext';
 import './TemplatesPage.css';
 
@@ -12,18 +13,25 @@ const TemplatesPage = () => {
     const [selectedId, setSelectedId] = useState(null);
     const [showBlockedPopup, setShowBlockedPopup] = useState(false);
     const [hasActiveRequest, setHasActiveRequest] = useState(false);
+    const [systemSettings, setSystemSettings] = useState(null);
+    const [userCredits, setUserCredits] = useState({ free: 0, pro: 0 });
     const [loading, setLoading] = useState(true);
+    const [blockReason, setBlockReason] = useState(null); // 'active', 'maintenance', 'free_limit'
 
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
             try {
-                const [tmpl, pending] = await Promise.all([
+                const [tmpl, pending, sys, creds] = await Promise.all([
                     getTemplates(),
-                    user ? getPendingOrdersByUser(user.uid) : Promise.resolve([])
+                    user ? getPendingOrdersByUser(user.uid) : Promise.resolve([]),
+                    getSystemSettings(),
+                    user ? getUserCredits(user.uid) : Promise.resolve({ free: 0, pro: 0 })
                 ]);
                 setTemplates(tmpl);
                 setHasActiveRequest(pending.length > 0);
+                setSystemSettings(sys);
+                setUserCredits(creds);
             } catch (error) {
                 console.error('Error loading templates:', error);
             }
@@ -34,9 +42,24 @@ const TemplatesPage = () => {
 
     const handleNext = () => {
         if (hasActiveRequest) {
+            setBlockReason('active');
             setShowBlockedPopup(true);
             return;
         }
+
+        if (systemSettings) {
+            if (systemSettings.disableAllGeneration) {
+                setBlockReason('maintenance');
+                setShowBlockedPopup(true);
+                return;
+            }
+            if (systemSettings.disableFreeGeneration && userCredits.pro <= 0) {
+                setBlockReason('free_limit');
+                setShowBlockedPopup(true);
+                return;
+            }
+        }
+
         if (selectedId) {
             navigate(`/requirements?template=${selectedId}`);
         }
@@ -159,17 +182,51 @@ const TemplatesPage = () => {
                     <div className="templates-blocked-overlay" onClick={() => setShowBlockedPopup(false)}>
                         <div className="templates-blocked-popup animate-scale-in glass-card" onClick={e => e.stopPropagation()}>
                             <button className="templates-blocked-close" onClick={() => setShowBlockedPopup(false)}>✕</button>
-                            <div className="templates-blocked-icon">⏳</div>
-                            <h3>Request Already in Progress</h3>
-                            <p>You already have a thumbnail request being processed. Please wait until it's completed before creating a new one.</p>
-                            <div className="templates-blocked-actions">
-                                <button className="btn btn-primary" onClick={() => navigate('/generating')}>
-                                    View Current Request
-                                </button>
-                                <button className="btn btn-secondary" onClick={() => setShowBlockedPopup(false)}>
-                                    Close
-                                </button>
-                            </div>
+
+                            {blockReason === 'active' && (
+                                <>
+                                    <div className="templates-blocked-icon">⏳</div>
+                                    <h3>Request Already in Progress</h3>
+                                    <p>You already have a thumbnail request being processed. Please wait until it's completed before creating a new one.</p>
+                                    <div className="templates-blocked-actions">
+                                        <button className="btn btn-primary" onClick={() => navigate('/generating')}>
+                                            View Current Request
+                                        </button>
+                                        <button className="btn btn-secondary" onClick={() => setShowBlockedPopup(false)}>
+                                            Close
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {blockReason === 'maintenance' && (
+                                <>
+                                    <div className="templates-blocked-icon">🛠️</div>
+                                    <h3 style={{ color: '#ef4444' }}>System Maintenance</h3>
+                                    <p>Our AI servers are temporarily offline or experiencing extreme load. Please check back soon.</p>
+                                    <div className="templates-blocked-actions">
+                                        <button className="btn btn-secondary" onClick={() => setShowBlockedPopup(false)}>
+                                            Understood
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {blockReason === 'free_limit' && (
+                                <>
+                                    <div className="templates-blocked-icon">📈</div>
+                                    <h3 style={{ color: '#f59e0b' }}>High Server Load</h3>
+                                    <p>Due to heavy traffic, free generations are temporarily paused. Upgrading to Pro bypasses this queue.</p>
+                                    <div className="templates-blocked-actions">
+                                        <button className="btn btn-primary" onClick={() => navigate('/credits')}>
+                                            Get Pro Credits
+                                        </button>
+                                        <button className="btn btn-secondary" onClick={() => setShowBlockedPopup(false)}>
+                                            Close
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 )}

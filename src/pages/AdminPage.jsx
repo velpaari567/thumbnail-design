@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getTemplates, saveTemplates } from '../data/templateData';
 import { getCreditPackages, saveCreditPackages, getSpeedTiers, saveSpeedTiers } from '../data/pricingData';
+import { getSystemSettings, updateSystemSettings } from '../utils/system';
 import { getAllOrders, deliverOrder } from '../utils/orders';
 import { getAllPaymentRequests, approvePaymentRequest, rejectPaymentRequest } from '../utils/payments';
 import { getOffers, saveOffer, deleteOffer } from '../utils/offers';
+import { getAllUsers } from '../utils/users'; // Added import for getAllUsers
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import './AdminPage.css';
@@ -17,6 +19,7 @@ const AdminPage = () => {
     const [templates, setTemplates] = useState([]);
     const [creditPackages, setCreditPackages] = useState([]);
     const [speedTiers, setSpeedTiers] = useState([]);
+    const [systemSettings, setSystemSettings] = useState({ disableFreeGeneration: false, disableAllGeneration: false });
     const [orders, setOrders] = useState([]);
     const [users, setUsers] = useState([]);
     const [saved, setSaved] = useState(false);
@@ -37,25 +40,24 @@ const AdminPage = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [tmpl, pkgs, tiers, allOrders, payments, offers] = await Promise.all([
+                const [o, u, p, t, c, s, sys, offers] = await Promise.all([
+                    getAllOrders(),
+                    getAllUsers(),
+                    getAllPaymentRequests(),
                     getTemplates(),
                     getCreditPackages(),
                     getSpeedTiers(),
-                    getAllOrders(),
-                    getAllPaymentRequests(),
+                    getSystemSettings(),
                     getOffers()
                 ]);
-                setTemplates(tmpl);
-                setCreditPackages(pkgs);
-                setSpeedTiers(tiers);
-                setOrders(allOrders);
-                setPaymentRequests(payments);
+                setOrders(o);
+                setUsers(u);
+                setPaymentRequests(p);
+                setTemplates(t);
+                setCreditPackages(c);
+                setSpeedTiers(s);
+                setSystemSettings(sys);
                 setAllOffers(offers);
-
-                // Get users from Firestore
-                const usersSnap = await getDocs(collection(db, 'users'));
-                const usersList = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
-                setUsers(usersList);
 
                 setLoading(false);
                 // Allow auto-save after initial load
@@ -72,14 +74,14 @@ const AdminPage = () => {
     useEffect(() => {
         const interval = setInterval(async () => {
             try {
-                const [allOrders, payments] = await Promise.all([
+                const [allOrders, payments, allUsers] = await Promise.all([
                     getAllOrders(),
-                    getAllPaymentRequests()
+                    getAllPaymentRequests(),
+                    getAllUsers()
                 ]);
                 setOrders(allOrders);
                 setPaymentRequests(payments);
-                const usersSnap = await getDocs(collection(db, 'users'));
-                setUsers(usersSnap.docs.map(d => ({ uid: d.id, ...d.data() })));
+                setUsers(allUsers);
             } catch (error) {
                 console.error('Error refreshing data:', error);
             }
@@ -87,26 +89,32 @@ const AdminPage = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Auto-save templates
+    // Auto-save logic
     useEffect(() => {
-        if (firstLoad.current || templates.length === 0) return;
-        saveTemplates(templates);
-        showSaved();
-    }, [templates]);
+        if (firstLoad.current) return;
 
-    // Auto-save credit packages
-    useEffect(() => {
-        if (firstLoad.current || creditPackages.length === 0) return;
-        saveCreditPackages(creditPackages);
-        showSaved();
-    }, [creditPackages]);
+        const saveData = async () => {
+            try {
+                if (activeTab === 'templates') {
+                    await saveTemplates(templates);
+                } else if (activeTab === 'packages') {
+                    await saveCreditPackages(creditPackages);
+                } else if (activeTab === 'speed') {
+                    await saveSpeedTiers(speedTiers);
+                } else if (activeTab === 'settings') {
+                    await updateSystemSettings(systemSettings);
+                }
+                showSaved();
+            } catch (error) {
+                console.error(`Error saving data for tab ${activeTab}: `, error);
+            }
+        };
 
-    // Auto-save speed tiers
-    useEffect(() => {
-        if (firstLoad.current || speedTiers.length === 0) return;
-        saveSpeedTiers(speedTiers);
-        showSaved();
-    }, [speedTiers]);
+        const debounceSave = setTimeout(saveData, 1000); // Debounce save to prevent too many writes
+        return () => clearTimeout(debounceSave);
+
+    }, [templates, creditPackages, speedTiers, systemSettings, activeTab]);
+
 
     const showSaved = () => {
         setSaved(true);
@@ -135,13 +143,13 @@ const AdminPage = () => {
 
         if (type === 'photos') {
             updated[tIndex].requirements.photos.push({
-                id: `photo-${Date.now()}`,
+                id: `photo - ${Date.now()} `,
                 label: 'New Photo',
                 required: false
             });
         } else {
             updated[tIndex].requirements.texts.push({
-                id: `text-${Date.now()}`,
+                id: `text - ${Date.now()} `,
                 label: 'New Text Field',
                 placeholder: 'Enter text...',
                 required: false
@@ -184,6 +192,11 @@ const AdminPage = () => {
         const updated = [...speedTiers];
         updated[index] = { ...updated[index], [field]: field === 'extraCredits' || field === 'minutes' ? Number(value) : value };
         setSpeedTiers(updated);
+    };
+
+    // System Settings editing
+    const handleSystemSettingToggle = (field) => {
+        setSystemSettings(prev => ({ ...prev, [field]: !prev[field] }));
     };
 
     // Order delivery
@@ -307,14 +320,15 @@ const AdminPage = () => {
                         { id: 'payments', label: '💰 Payments', badge: pendingPayments.length || null },
                         { id: 'orders', label: '📦 Orders', badge: pendingOrders.length || null },
                         { id: 'offers', label: '🎁 Offers', badge: allOffers.length || null },
-                        { id: 'users', label: '👥 Users', badge: `${users.length}` },
+                        { id: 'users', label: '👥 Users', badge: `${users.length} ` },
                         { id: 'templates', label: '🎨 Templates' },
                         { id: 'packages', label: '💎 Credit Packages' },
-                        { id: 'speed', label: '⚡ Speed Tiers' }
+                        { id: 'speed', label: '⚡ Speed Tiers' },
+                        { id: 'settings', label: '⚙️ Controls' }
                     ].map(tab => (
                         <button
                             key={tab.id}
-                            className={`admin-tab ${activeTab === tab.id ? 'active' : ''}`}
+                            className={`admin - tab ${activeTab === tab.id ? 'active' : ''} `}
                             onClick={() => setActiveTab(tab.id)}
                         >
                             {tab.label}
@@ -336,7 +350,7 @@ const AdminPage = () => {
                         ) : (
                             <div className="admin-orders-list">
                                 {paymentRequests.map(req => (
-                                    <div key={req.id} className={`admin-order-card glass-card ${req.status === 'pending' ? 'admin-payment-pending' : ''}`}>
+                                    <div key={req.id} className={`admin - order - card glass - card ${req.status === 'pending' ? 'admin-payment-pending' : ''} `}>
                                         <div className="admin-order-header">
                                             <div className="admin-order-left">
                                                 <div className="admin-order-template-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)' }}>
@@ -352,7 +366,7 @@ const AdminPage = () => {
                                                 </div>
                                             </div>
                                             <div className="admin-order-right">
-                                                <span className={`admin-order-status status-${req.status}`}>
+                                                <span className={`admin - order - status status - ${req.status} `}>
                                                     {req.status === 'pending' ? '⏳ Pending' :
                                                         req.status === 'approved' ? '✅ Approved' : '❌ Rejected'}
                                                 </span>
@@ -563,7 +577,7 @@ const AdminPage = () => {
                                     else if (start && start > now) status = 'upcoming';
 
                                     return (
-                                        <div key={offer.id} className={`admin-order-card glass-card admin-offer-card-${status}`}>
+                                        <div key={offer.id} className={`admin - order - card glass - card admin - offer - card - ${status} `}>
                                             <div className="admin-order-header">
                                                 <div className="admin-order-left">
                                                     <div className="admin-order-template-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', fontSize: '1.3rem' }}>
@@ -577,7 +591,7 @@ const AdminPage = () => {
                                                     </div>
                                                 </div>
                                                 <div className="admin-order-right">
-                                                    <span className={`admin-order-status status-${status}`}>
+                                                    <span className={`admin - order - status status - ${status} `}>
                                                         {status === 'active' ? '🟢 Live' :
                                                             status === 'upcoming' ? '🟡 Upcoming' :
                                                                 status === 'expired' ? '🔴 Expired' : '⚪ Inactive'}
@@ -657,7 +671,7 @@ const AdminPage = () => {
                                                 </div>
                                             </div>
                                             <div className="admin-order-right">
-                                                <span className={`admin-order-status status-${order.status}`}>
+                                                <span className={`admin - order - status status - ${order.status} `}>
                                                     {order.status === 'pending' ? '⏳ Pending' :
                                                         order.status === 'delivered' ? '✅ Delivered' : '🔄 In Progress'}
                                                 </span>
@@ -1123,6 +1137,70 @@ const AdminPage = () => {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* SETTINGS TAB */}
+                {activeTab === 'settings' && (
+                    <div className="admin-section animate-fade-in">
+                        <div className="admin-settings-container glass-card" style={{ padding: 'var(--space-2xl)', maxWidth: '600px', margin: '0 auto' }}>
+                            <h2 style={{ marginBottom: 'var(--space-xl)', color: 'var(--accent-primary)' }}>System Controls</h2>
+                            <p style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-2xl)', fontSize: 'var(--font-sm)' }}>
+                                Use these switches to pause thumbnail generation during heavy server load or maintenance.
+                            </p>
+
+                            <div className="admin-setting-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-xl) 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                <div>
+                                    <strong style={{ display: 'block', fontSize: '1.1rem', marginBottom: '4px' }}>Disable FREE Generations</strong>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Users with 0 Pro credits will be blocked.</span>
+                                </div>
+                                <label className="admin-switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '28px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={systemSettings.disableFreeGeneration}
+                                        onChange={() => handleSystemSettingToggle('disableFreeGeneration')}
+                                        style={{ opacity: 0, width: 0, height: 0 }}
+                                    />
+                                    <span className="slider round" style={{
+                                        position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                                        backgroundColor: systemSettings.disableFreeGeneration ? '#f59e0b' : 'rgba(255,255,255,0.2)',
+                                        transition: '.4s', borderRadius: '34px'
+                                    }}>
+                                        <span style={{
+                                            position: 'absolute', height: '20px', width: '20px', left: '4px', bottom: '4px',
+                                            backgroundColor: 'white', transition: '.4s', borderRadius: '50%',
+                                            transform: systemSettings.disableFreeGeneration ? 'translateX(22px)' : 'none'
+                                        }}></span>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div className="admin-setting-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-xl) 0' }}>
+                                <div>
+                                    <strong style={{ display: 'block', fontSize: '1.1rem', marginBottom: '4px', color: '#ef4444' }}>Disable ALL Generations</strong>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>No user will be able to generate. Use for maintenance.</span>
+                                </div>
+                                <label className="admin-switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '28px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={systemSettings.disableAllGeneration}
+                                        onChange={() => handleSystemSettingToggle('disableAllGeneration')}
+                                        style={{ opacity: 0, width: 0, height: 0 }}
+                                    />
+                                    <span className="slider round" style={{
+                                        position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                                        backgroundColor: systemSettings.disableAllGeneration ? '#ef4444' : 'rgba(255,255,255,0.2)',
+                                        transition: '.4s', borderRadius: '34px'
+                                    }}>
+                                        <span style={{
+                                            position: 'absolute', height: '20px', width: '20px', left: '4px', bottom: '4px',
+                                            backgroundColor: 'white', transition: '.4s', borderRadius: '50%',
+                                            transform: systemSettings.disableAllGeneration ? 'translateX(22px)' : 'none'
+                                        }}></span>
+                                    </span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 )}

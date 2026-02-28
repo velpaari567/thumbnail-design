@@ -1,5 +1,6 @@
 // User registry utilities
-// Tracks all users who have signed in via Google
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export const registerUser = (user) => {
     const users = getRegisteredUsers();
@@ -47,4 +48,14 @@ export const getUsersWithCredits = () => {
         ...user,
         credits
     }));
+};
+
+export const getAllUsers = async () => {
+    try {
+        const usersSnap = await getDocs(collection(db, 'users'));
+        return usersSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    } catch (error) {
+        console.error("Error fetching all users:", error);
+        return [];
+    }
 };
