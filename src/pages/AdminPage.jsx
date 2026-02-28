@@ -328,7 +328,7 @@ const AdminPage = () => {
                     ].map(tab => (
                         <button
                             key={tab.id}
-                            className={`admin - tab ${activeTab === tab.id ? 'active' : ''} `}
+                            className={`admin-tab ${activeTab === tab.id ? 'active' : ''}`}
                             onClick={() => setActiveTab(tab.id)}
                         >
                             {tab.label}
@@ -350,7 +350,7 @@ const AdminPage = () => {
                         ) : (
                             <div className="admin-orders-list">
                                 {paymentRequests.map(req => (
-                                    <div key={req.id} className={`admin - order - card glass - card ${req.status === 'pending' ? 'admin-payment-pending' : ''} `}>
+                                    <div key={req.id} className={`admin-order-card glass-card ${req.status === 'pending' ? 'admin-payment-pending' : ''}`}>
                                         <div className="admin-order-header">
                                             <div className="admin-order-left">
                                                 <div className="admin-order-template-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)' }}>
@@ -366,7 +366,7 @@ const AdminPage = () => {
                                                 </div>
                                             </div>
                                             <div className="admin-order-right">
-                                                <span className={`admin - order - status status - ${req.status} `}>
+                                                <span className={`admin-order-status status-${req.status}`}>
                                                     {req.status === 'pending' ? '⏳ Pending' :
                                                         req.status === 'approved' ? '✅ Approved' : '❌ Rejected'}
                                                 </span>
@@ -577,7 +577,7 @@ const AdminPage = () => {
                                     else if (start && start > now) status = 'upcoming';
 
                                     return (
-                                        <div key={offer.id} className={`admin - order - card glass - card admin - offer - card - ${status} `}>
+                                        <div key={offer.id} className={`admin-order-card glass-card admin-offer-card-${status}`}>
                                             <div className="admin-order-header">
                                                 <div className="admin-order-left">
                                                     <div className="admin-order-template-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', fontSize: '1.3rem' }}>
@@ -591,7 +591,7 @@ const AdminPage = () => {
                                                     </div>
                                                 </div>
                                                 <div className="admin-order-right">
-                                                    <span className={`admin - order - status status - ${status} `}>
+                                                    <span className={`admin-order-status status-${status}`}>
                                                         {status === 'active' ? '🟢 Live' :
                                                             status === 'upcoming' ? '🟡 Upcoming' :
                                                                 status === 'expired' ? '🔴 Expired' : '⚪ Inactive'}

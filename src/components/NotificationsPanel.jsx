@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { markNotificationRead, markAllNotificationsRead } from '../utils/notifications';
@@ -16,15 +16,20 @@ const NotificationsPanel = ({ isOpen, onClose, onUnreadCount }) => {
 
         const q = query(
             collection(db, 'notifications'),
-            where('userUid', '==', user.uid),
-            orderBy('createdAt', 'desc')
+            where('userUid', '==', user.uid)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            let notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Sort locally to avoid requiring a composite index in Firestore
+            notifs.sort((a, b) => b.createdAt - a.createdAt);
+
             setNotifications(notifs);
             const unreadCount = notifs.filter(n => !n.read).length;
             onUnreadCount(unreadCount);
+            setLoading(false);
+        }, (error) => {
+            console.error("Notifications error:", error);
             setLoading(false);
         });
 
