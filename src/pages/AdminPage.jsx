@@ -866,7 +866,7 @@ const AdminPage = () => {
                         {templates.map((template, tIndex) => (
                             <div key={template.id} className="admin-template-card glass-card">
                                 <div className="admin-template-header">
-                                    <div className="admin-template-icon" style={{
+                                    <div className="admin-template-preview" style={{
                                         background: template.previewColor,
                                         backgroundImage: template.thumbnailUrl ? `url(${template.thumbnailUrl})` : 'none',
                                         backgroundSize: 'cover',

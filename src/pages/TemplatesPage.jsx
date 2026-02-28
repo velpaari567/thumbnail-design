@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getTemplates } from '../data/templateData';
 import { getPendingOrdersByUser } from '../utils/orders';
 import { getSystemSettings } from '../utils/system';
 import { getUserCredits } from '../utils/credits';
