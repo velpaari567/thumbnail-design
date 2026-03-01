@@ -9,7 +9,8 @@ import { getAllPaymentRequests, approvePaymentRequest, rejectPaymentRequest } fr
 import { getOffers, saveOffer, deleteOffer } from '../utils/offers';
 import { getAllUsers } from '../utils/users'; // Added import for getAllUsers
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../firebase';
 import './AdminPage.css';
 
 const AdminPage = () => {
@@ -202,33 +203,42 @@ const AdminPage = () => {
         setCreditPackages(updated);
     };
 
-    const handleTemplateImageUpload = (tIndex, e) => {
+    const handleTemplateImageUpload = async (tIndex, e) => {
         const file = e.target.files[0];
         if (file) {
-            if (file.size > 1048576) {
-                alert('Image is too large. Please use an image under 1MB.');
+            if (file.size > 5242880) { // 5MB limit
+                alert('Image is too large. Please use an image under 5MB.');
                 return;
             }
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                updateTemplate(tIndex, 'thumbnailUrl', ev.target.result);
-            };
-            reader.readAsDataURL(file);
+            try {
+                // Show a temporary loading indicator or just update state later
+                const storageRef = ref(storage, `templates/thumb_${Date.now()}_${file.name}`);
+                const snapshot = await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                updateTemplate(tIndex, 'thumbnailUrl', downloadURL);
+            } catch (error) {
+                console.error("Error uploading template image: ", error);
+                alert("Failed to upload image. Please try again.");
+            }
         }
     };
 
-    const handleTemplateActualImageUpload = (tIndex, e) => {
+    const handleTemplateActualImageUpload = async (tIndex, e) => {
         const file = e.target.files[0];
         if (file) {
-            if (file.size > 1048576) {
-                alert('Image is too large. Please use an image under 1MB.');
+            if (file.size > 5242880) { // 5MB limit
+                alert('Image is too large. Please use an image under 5MB.');
                 return;
             }
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                updateTemplate(tIndex, 'actualThumbnailUrl', ev.target.result);
-            };
-            reader.readAsDataURL(file);
+            try {
+                const storageRef = ref(storage, `templates/actual_${Date.now()}_${file.name}`);
+                const snapshot = await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                updateTemplate(tIndex, 'actualThumbnailUrl', downloadURL);
+            } catch (error) {
+                console.error("Error uploading actual template image: ", error);
+                alert("Failed to upload image. Please try again.");
+            }
         }
     };
 
