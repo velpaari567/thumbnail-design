@@ -35,7 +35,35 @@ const RequirementsPage = () => {
         loadTemplate();
     }, [templateId, navigate]);
 
-    const handlePhotoChange = (photoId, file) => {
+    const compressImage = (file, maxWidth, quality) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = (error) => reject(error);
+            };
+            reader.onerror = (error) => reject(error);
+        });
+    };
+
+    const handlePhotoChange = async (photoId, file) => {
         if (file) {
             // Check file size (3MB limit)
             const MAX_SIZE_MB = 3;
@@ -45,11 +73,16 @@ const RequirementsPage = () => {
             }
 
             setPhotos(prev => ({ ...prev, [photoId]: file }));
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                setPhotoPreviews(prev => ({ ...prev, [photoId]: e.target.result }));
-            };
-            reader.readAsDataURL(file);
+
+            try {
+                // Compress user images to fit within 1MB Firestore limit per order
+                // Keep dimensions large enough for editing (1200px) but compress jpeg aggressively
+                const compressedBase64 = await compressImage(file, 1200, 0.75);
+                setPhotoPreviews(prev => ({ ...prev, [photoId]: compressedBase64 }));
+            } catch (error) {
+                console.error("Error compressing image:", error);
+                alert("Failed to process image. Please try again.");
+            }
         }
     };
 
