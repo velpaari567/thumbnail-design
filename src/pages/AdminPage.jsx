@@ -208,17 +208,20 @@ const AdminPage = () => {
         if (file) {
             if (file.size > 5242880) { // 5MB limit
                 alert('Image is too large. Please use an image under 5MB.');
+                e.target.value = ''; // Reset input
                 return;
             }
             try {
                 // Show a temporary loading indicator or just update state later
-                const storageRef = ref(storage, `templates/thumb_${Date.now()}_${file.name}`);
+                const storageRef = ref(storage, `requests/templates/thumb_${Date.now()}_${file.name}`);
                 const snapshot = await uploadBytes(storageRef, file);
                 const downloadURL = await getDownloadURL(snapshot.ref);
                 updateTemplate(tIndex, 'thumbnailUrl', downloadURL);
+                e.target.value = ''; // Reset input
             } catch (error) {
                 console.error("Error uploading template image: ", error);
-                alert("Failed to upload image. Please try again.");
+                alert("Failed to upload image: " + error.message);
+                e.target.value = ''; // Reset input
             }
         }
     };
@@ -228,16 +231,19 @@ const AdminPage = () => {
         if (file) {
             if (file.size > 5242880) { // 5MB limit
                 alert('Image is too large. Please use an image under 5MB.');
+                e.target.value = ''; // Reset input
                 return;
             }
             try {
-                const storageRef = ref(storage, `templates/actual_${Date.now()}_${file.name}`);
+                const storageRef = ref(storage, `requests/templates/actual_${Date.now()}_${file.name}`);
                 const snapshot = await uploadBytes(storageRef, file);
                 const downloadURL = await getDownloadURL(snapshot.ref);
                 updateTemplate(tIndex, 'actualThumbnailUrl', downloadURL);
+                e.target.value = ''; // Reset input
             } catch (error) {
                 console.error("Error uploading actual template image: ", error);
-                alert("Failed to upload image. Please try again.");
+                alert("Failed to upload image: " + error.message);
+                e.target.value = ''; // Reset input
             }
         }
     };
