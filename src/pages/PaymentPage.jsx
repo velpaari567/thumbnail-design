@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTemplateById } from '../data/templateData';
 import { getUserCredits, deductCredits, addCredits } from '../utils/credits';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase';
 import { startTimer } from '../utils/timer';
 import { saveOrder } from '../utils/orders';
 import { useAuth } from '../context/AuthContext';
@@ -69,8 +71,37 @@ const PaymentPage = () => {
             return;
         }
 
+        // Upload photos to Firebase Storage to avoid 1MB Firestore limit
+        const orderId = `order-${Date.now()}`;
+        const finalPhotos = [];
+
+        try {
+            if (order.photos && order.photos.length > 0) {
+                for (const photo of order.photos) {
+                    if (photo.dataUrl) {
+                        const fileExtension = photo.dataUrl.substring(photo.dataUrl.indexOf('/') + 1, photo.dataUrl.indexOf(';base64'));
+                        const storageRef = ref(storage, `requests/${orderId}/${photo.id}.${fileExtension || 'png'}`);
+                        await uploadString(storageRef, photo.dataUrl, 'data_url');
+                        const downloadUrl = await getDownloadURL(storageRef);
+                        finalPhotos.push({
+                            ...photo,
+                            dataUrl: downloadUrl // Replace base64 with direct URL
+                        });
+                    } else {
+                        finalPhotos.push(photo);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Error uploading photos:", error);
+            await addCredits(user.uid, totalCost, 'free');
+            setProcessing(false);
+            alert('An error occurred uploading your photos. Your credits have been refunded.');
+            return;
+        }
+
         // Save full order to Firestore (for admin panel)
-        const savedOrder = await saveOrder(`order-${Date.now()}`, {
+        const savedOrder = await saveOrder(orderId, {
             userUid: user.uid,
             userEmail: user.email || '',
             userName: user.displayName || '',
@@ -79,7 +110,7 @@ const PaymentPage = () => {
             templateIcon: template.icon || '🎨',
             templatePreviewColor: template.previewColor || '#000000',
             texts: order.texts || {},
-            photos: order.photos || [],
+            photos: finalPhotos,
             speedTier: order.speedTier || null,
             baseCost: effectiveCost || 0,
             totalCost: totalCost || 0
