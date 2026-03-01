@@ -119,7 +119,43 @@ const RequirementsPage = () => {
                             Template: <strong>{template.name}</strong> {template.icon}
                         </p>
                     </div>
-                    <div className="templates-step-badge">Step 2 of 4</div>
+                    {/* Before/After Thumbnail Preview */}
+                    {(template.thumbnailUrl || template.actualThumbnailUrl) && (
+                        <div className="preview-container">
+                            {template.thumbnailUrl && (
+                                <div
+                                    className="preview-image"
+                                    style={{ backgroundImage: `url(${template.thumbnailUrl})` }}
+                                    title="Template Preview"
+                                />
+                            )}
+                            {template.actualThumbnailUrl && (
+                                <div
+                                    className={`preview-image ${template.thumbnailUrl ? 'preview-fader' : ''}`}
+                                    style={{ backgroundImage: `url(${template.actualThumbnailUrl})` }}
+                                    title="Actual Final Result"
+                                />
+                            )}
+                            {template.thumbnailUrl && template.actualThumbnailUrl && (
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '4px',
+                                    right: '4px',
+                                    background: 'rgba(0,0,0,0.6)',
+                                    padding: '2px 6px',
+                                    borderRadius: '10px',
+                                    fontSize: '10px',
+                                    color: 'white',
+                                    fontWeight: 'bold',
+                                    pointerEvents: 'none',
+                                    zIndex: 10
+                                }}>
+                                    Before & After View
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <div className="templates-step-badge" style={{ marginLeft: 'auto' }}>Step 2 of 4</div>
                 </div>
 
                 <div className="req-content">

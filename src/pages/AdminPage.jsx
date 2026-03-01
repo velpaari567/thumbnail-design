@@ -217,6 +217,21 @@ const AdminPage = () => {
         }
     };
 
+    const handleTemplateActualImageUpload = (tIndex, e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 1048576) {
+                alert('Image is too large. Please use an image under 1MB.');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                updateTemplate(tIndex, 'actualThumbnailUrl', ev.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     // Speed tier editing
     const updateSpeedTier = (index, field, value) => {
         const updated = [...speedTiers];
@@ -901,74 +916,119 @@ const AdminPage = () => {
                         {templates.map((template, tIndex) => (
                             <div key={template.id} className="admin-template-card glass-card" style={{ position: 'relative' }}>
                                 <div className="admin-template-header">
-                                    <div className="admin-template-preview" style={{
-                                        background: template.previewColor,
-                                        backgroundImage: template.thumbnailUrl ? `url(${template.thumbnailUrl})` : 'none',
-                                        backgroundSize: 'cover',
-                                        backgroundPosition: 'center',
-                                        position: 'relative',
-                                        overflow: 'hidden'
-                                    }}>
-                                        <button
-                                            onClick={() => removeTemplate(tIndex)}
-                                            style={{
-                                                position: 'absolute',
-                                                top: '-5px',
-                                                left: '-5px',
-                                                background: '#ef4444',
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '50%',
-                                                width: '24px',
-                                                height: '24px',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '14px',
-                                                fontWeight: 'bold',
-                                                zIndex: 10
-                                            }}
-                                            title="Delete Template"
-                                        >
-                                            ×
-                                        </button>
-                                        {!template.thumbnailUrl && (
-                                            <input
-                                                type="text"
-                                                value={template.icon}
-                                                onChange={(e) => updateTemplate(tIndex, 'icon', e.target.value)}
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        {/* Template Preview (Before) */}
+                                        <div className="admin-template-preview" style={{
+                                            background: template.previewColor,
+                                            backgroundImage: template.thumbnailUrl ? `url(${template.thumbnailUrl})` : 'none',
+                                            backgroundSize: 'cover',
+                                            backgroundPosition: 'center',
+                                            position: 'relative',
+                                            overflow: 'hidden'
+                                        }}>
+                                            <div style={{ position: 'absolute', top: 0, left: 0, background: 'rgba(0,0,0,0.7)', color: 'white', fontSize: '10px', padding: '2px 4px', borderBottomRightRadius: '4px', zIndex: 5 }}>
+                                                Template
+                                            </div>
+                                            <button
+                                                onClick={() => removeTemplate(tIndex)}
                                                 style={{
-                                                    background: 'transparent',
-                                                    border: 'none',
+                                                    position: 'absolute',
+                                                    top: '-5px',
+                                                    left: '-5px',
+                                                    background: '#ef4444',
                                                     color: 'white',
-                                                    fontSize: '1.5rem',
-                                                    width: '40px',
-                                                    textAlign: 'center',
-                                                    padding: 0
+                                                    border: 'none',
+                                                    borderRadius: '50%',
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '14px',
+                                                    fontWeight: 'bold',
+                                                    zIndex: 10
                                                 }}
-                                                title="Edit Emoji/Icon"
-                                            />
-                                        )}
-                                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.5)', padding: '2px', textAlign: 'center' }}>
-                                            <label style={{ fontSize: '0.6rem', color: 'white', cursor: 'pointer', display: 'block' }}>
-                                                Upload
+                                                title="Delete Template"
+                                            >
+                                                ×
+                                            </button>
+                                            {!template.thumbnailUrl && (
                                                 <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    style={{ display: 'none' }}
-                                                    onChange={(e) => handleTemplateImageUpload(tIndex, e)}
+                                                    type="text"
+                                                    value={template.icon}
+                                                    onChange={(e) => updateTemplate(tIndex, 'icon', e.target.value)}
+                                                    style={{
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        color: 'white',
+                                                        fontSize: '1.5rem',
+                                                        width: '40px',
+                                                        textAlign: 'center',
+                                                        padding: 0
+                                                    }}
+                                                    title="Edit Emoji/Icon"
                                                 />
-                                            </label>
-                                            {template.thumbnailUrl && (
-                                                <button
-                                                    onClick={() => updateTemplate(tIndex, 'thumbnailUrl', null)}
-                                                    style={{ background: 'none', border: 'none', color: '#ff4444', fontSize: '0.6rem', cursor: 'pointer', padding: '0 2px' }}
-                                                    title="Remove Image"
-                                                >
-                                                    Remove
-                                                </button>
                                             )}
+                                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.5)', padding: '2px', textAlign: 'center' }}>
+                                                <label style={{ fontSize: '0.6rem', color: 'white', cursor: 'pointer', display: 'block' }}>
+                                                    Upload
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        style={{ display: 'none' }}
+                                                        onChange={(e) => handleTemplateImageUpload(tIndex, e)}
+                                                    />
+                                                </label>
+                                                {template.thumbnailUrl && (
+                                                    <button
+                                                        onClick={() => updateTemplate(tIndex, 'thumbnailUrl', null)}
+                                                        style={{ background: 'none', border: 'none', color: '#ff4444', fontSize: '0.6rem', cursor: 'pointer', padding: '0 2px' }}
+                                                        title="Remove Image"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Actual Thumbnail Preview (After) */}
+                                        <div className="admin-template-preview" style={{
+                                            background: template.previewColor,
+                                            backgroundImage: template.actualThumbnailUrl ? `url(${template.actualThumbnailUrl})` : 'none',
+                                            backgroundSize: 'cover',
+                                            backgroundPosition: 'center',
+                                            position: 'relative',
+                                            overflow: 'hidden'
+                                        }}>
+                                            <div style={{ position: 'absolute', top: 0, left: 0, background: 'rgba(0,0,0,0.7)', color: 'white', fontSize: '10px', padding: '2px 4px', borderBottomRightRadius: '4px', zIndex: 5 }}>
+                                                Actual
+                                            </div>
+                                            {!template.actualThumbnailUrl && (
+                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', textAlign: 'center', padding: '10px' }}>
+                                                    Final<br />Result
+                                                </div>
+                                            )}
+                                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.5)', padding: '2px', textAlign: 'center' }}>
+                                                <label style={{ fontSize: '0.6rem', color: 'white', cursor: 'pointer', display: 'block' }}>
+                                                    Upload
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        style={{ display: 'none' }}
+                                                        onChange={(e) => handleTemplateActualImageUpload(tIndex, e)}
+                                                    />
+                                                </label>
+                                                {template.actualThumbnailUrl && (
+                                                    <button
+                                                        onClick={() => updateTemplate(tIndex, 'actualThumbnailUrl', null)}
+                                                        style={{ background: 'none', border: 'none', color: '#ff4444', fontSize: '0.6rem', cursor: 'pointer', padding: '0 2px' }}
+                                                        title="Remove Image"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <div style={{ flex: 1 }}>

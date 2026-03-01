@@ -159,3 +159,47 @@
         flex-direction: column;
     }
 }
+
+/* Fading animation for Template vs Actual Thumbnail preview */
+.preview-container {
+    position: relative;
+    width: 250px;
+    height: 140px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.preview-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+}
+
+.preview-fader {
+    animation: crossfade 6s infinite;
+}
+
+@keyframes crossfade {
+
+    0%,
+    40% {
+        opacity: 1;
+        /* Show image 1 */
+    }
+
+    50%,
+    90% {
+        opacity: 0;
+        /* Fade out to reveal image 2 underneath */
+    }
+
+    100% {
+        opacity: 1;
+        /* Fade back to image 1 */
+    }
+}
