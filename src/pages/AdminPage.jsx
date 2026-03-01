@@ -127,6 +127,31 @@ const AdminPage = () => {
     };
 
     // Template editing
+    const addNewTemplate = () => {
+        const newTemplate = {
+            id: `template-${Date.now()}`,
+            name: 'New Template',
+            description: 'Enter a description',
+            previewColor: 'linear-gradient(135deg, #333333, #666666)',
+            icon: '✏️',
+            requirements: {
+                photos: [],
+                texts: []
+            },
+            baseCost: 10,
+            offerCost: null
+        };
+        setTemplates([...templates, newTemplate]);
+    };
+
+    const removeTemplate = (index) => {
+        if (window.confirm("Are you sure you want to delete this template? This cannot be undone.")) {
+            const updated = [...templates];
+            updated.splice(index, 1);
+            setTemplates(updated);
+        }
+    };
+
     const updateTemplate = (index, field, value) => {
         const updated = [...templates];
         updated[index] = { ...updated[index], [field]: value };
@@ -868,8 +893,13 @@ const AdminPage = () => {
                 {/* TEMPLATES TAB */}
                 {activeTab === 'templates' && (
                     <div className="admin-section animate-fade-in">
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-md)' }}>
+                            <button className="btn btn-primary" onClick={addNewTemplate}>
+                                + Add New Template
+                            </button>
+                        </div>
                         {templates.map((template, tIndex) => (
-                            <div key={template.id} className="admin-template-card glass-card">
+                            <div key={template.id} className="admin-template-card glass-card" style={{ position: 'relative' }}>
                                 <div className="admin-template-header">
                                     <div className="admin-template-preview" style={{
                                         background: template.previewColor,
@@ -879,6 +909,30 @@ const AdminPage = () => {
                                         position: 'relative',
                                         overflow: 'hidden'
                                     }}>
+                                        <button
+                                            onClick={() => removeTemplate(tIndex)}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '-5px',
+                                                left: '-5px',
+                                                background: '#ef4444',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '50%',
+                                                width: '24px',
+                                                height: '24px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '14px',
+                                                fontWeight: 'bold',
+                                                zIndex: 10
+                                            }}
+                                            title="Delete Template"
+                                        >
+                                            ×
+                                        </button>
                                         {!template.thumbnailUrl && (
                                             <input
                                                 type="text"
