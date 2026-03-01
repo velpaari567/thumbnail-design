@@ -37,8 +37,8 @@ const RequirementsPage = () => {
 
     const handlePhotoChange = (photoId, file) => {
         if (file) {
-            // Check file size (5MB limit)
-            const MAX_SIZE_MB = 5;
+            // Check file size (3MB limit)
+            const MAX_SIZE_MB = 3;
             if (file.size > MAX_SIZE_MB * 1024 * 1024) {
                 alert(`The image is too large! Please select an image under ${MAX_SIZE_MB}MB.`);
                 return;

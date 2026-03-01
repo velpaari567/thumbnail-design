@@ -203,46 +203,60 @@ const AdminPage = () => {
         setCreditPackages(updated);
     };
 
+    const compressImage = (file, maxWidth, quality) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    // Shrink to fit maxWidth while maintaining aspect ratio
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = (error) => reject(error);
+            };
+            reader.onerror = (error) => reject(error);
+        });
+    };
+
     const handleTemplateImageUpload = async (tIndex, e) => {
         const file = e.target.files[0];
         if (file) {
-            if (file.size > 5242880) { // 5MB limit
-                alert('Image is too large. Please use an image under 5MB.');
-                e.target.value = ''; // Reset input
-                return;
-            }
             try {
-                // Show a temporary loading indicator or just update state later
-                const storageRef = ref(storage, `requests/templates/thumb_${Date.now()}_${file.name}`);
-                const snapshot = await uploadBytes(storageRef, file);
-                const downloadURL = await getDownloadURL(snapshot.ref);
-                updateTemplate(tIndex, 'thumbnailUrl', downloadURL);
+                // Compress admin thumbnail before saving to Firestore to avoid 1MB limit
+                const compressedBase64 = await compressImage(file, 800, 0.7);
+                updateTemplate(tIndex, 'thumbnailUrl', compressedBase64);
                 e.target.value = ''; // Reset input
             } catch (error) {
-                console.error("Error uploading template image: ", error);
-                alert("Failed to upload image: " + error.message);
+                console.error("Error compressing template image: ", error);
+                alert("Failed to process image. Please try again.");
                 e.target.value = ''; // Reset input
             }
         }
     };
-
     const handleTemplateActualImageUpload = async (tIndex, e) => {
         const file = e.target.files[0];
         if (file) {
-            if (file.size > 5242880) { // 5MB limit
-                alert('Image is too large. Please use an image under 5MB.');
-                e.target.value = ''; // Reset input
-                return;
-            }
             try {
-                const storageRef = ref(storage, `requests/templates/actual_${Date.now()}_${file.name}`);
-                const snapshot = await uploadBytes(storageRef, file);
-                const downloadURL = await getDownloadURL(snapshot.ref);
-                updateTemplate(tIndex, 'actualThumbnailUrl', downloadURL);
+                // Compress admin thumbnail before saving to Firestore to avoid 1MB limit
+                const compressedBase64 = await compressImage(file, 800, 0.7);
+                updateTemplate(tIndex, 'actualThumbnailUrl', compressedBase64);
                 e.target.value = ''; // Reset input
             } catch (error) {
-                console.error("Error uploading actual template image: ", error);
-                alert("Failed to upload image: " + error.message);
+                console.error("Error compressing actual template image: ", error);
+                alert("Failed to process image. Please try again.");
                 e.target.value = ''; // Reset input
             }
         }
