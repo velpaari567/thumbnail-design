@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getTemplateById } from '../data/templateData';
-import { getUserCredits, deductCredits } from '../utils/credits';
+import { getUserCredits, deductCredits, addCredits } from '../utils/credits';
 import { startTimer } from '../utils/timer';
 import { saveOrder } from '../utils/orders';
 import { useAuth } from '../context/AuthContext';
@@ -72,21 +72,25 @@ const PaymentPage = () => {
         // Save full order to Firestore (for admin panel)
         const savedOrder = await saveOrder(`order-${Date.now()}`, {
             userUid: user.uid,
-            userEmail: user.email,
-            userName: user.displayName,
-            templateId: template.id,
-            templateName: template.name,
-            templateIcon: template.icon,
-            templatePreviewColor: template.previewColor,
+            userEmail: user.email || '',
+            userName: user.displayName || '',
+            templateId: template.id || '',
+            templateName: template.name || '',
+            templateIcon: template.icon || '🎨',
+            templatePreviewColor: template.previewColor || '#000000',
             texts: order.texts || {},
             photos: order.photos || [],
-            speedTier: order.speedTier,
-            baseCost: effectiveCost,
-            totalCost: totalCost
+            speedTier: order.speedTier || null,
+            baseCost: effectiveCost || 0,
+            totalCost: totalCost || 0
         });
 
+        // If order saving fails (e.g. 1MB Firestore limit, network error)
         if (!savedOrder) {
+            // Refund the deducted credits
+            await addCredits(user.uid, totalCost, 'free');
             setProcessing(false);
+            alert('An error occurred submitting your order! Your credits have been refunded. Please try using smaller images.');
             return;
         }
 
